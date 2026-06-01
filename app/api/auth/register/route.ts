@@ -20,10 +20,11 @@ export async function POST(req: NextRequest) {
     }
 
     const hashed = await bcrypt.hash(password, 12)
-    const isAdmin = email === process.env.ADMIN_EMAIL
 
+    // Public registration ALWAYS creates STUDENT role.
+    // Admin accounts can only be created via: node scripts/create-admin.mjs
     const user = await prisma.user.create({
-      data: { name, email, password: hashed, role: isAdmin ? 'ADMIN' : 'STUDENT' },
+      data: { name, email, password: hashed, role: 'STUDENT' },
       select: { id: true, name: true, email: true, role: true },
     })
 

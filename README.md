@@ -36,9 +36,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
-**Default credentials:**
-- Admin: `admin@kiithub.com` / `Admin@123`
-- Student: `student@kiit.ac.in` / `Student@123`
+> **Admin setup:** Run `node scripts/create-admin.mjs` with `ADMIN_EMAIL` and `ADMIN_PASSWORD` environment variables set.
 
 ## ⚙️ Environment Variables
 
@@ -69,7 +67,7 @@ SMTP_USER=""
 SMTP_PASS=""
 
 # Admin
-ADMIN_EMAIL="admin@kiithub.com"
+ADMIN_EMAIL="your-admin-email@example.com"
 ```
 
 ## 📁 Project Structure

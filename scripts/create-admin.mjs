@@ -1,4 +1,4 @@
-// create-admin.mjs  — run with: node scripts/create-admin.mjs
+// create-admin.mjs  — run with: ADMIN_EMAIL=you@domain.com ADMIN_PASSWORD=YourPass node scripts/create-admin.mjs
 import { createRequire } from 'module'
 const require = createRequire(import.meta.url)
 
@@ -7,9 +7,15 @@ const { PrismaClient } = require('@prisma/client')
 
 const prisma = new PrismaClient()
 
-const ADMIN_EMAIL    = process.env.ADMIN_EMAIL    || 'admin@kiithub.com'
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@123'
-const ADMIN_NAME     = 'KIITHUB Admin'
+const ADMIN_EMAIL    = process.env.ADMIN_EMAIL
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD
+const ADMIN_NAME     = process.env.ADMIN_NAME || 'KIITHUB Admin'
+
+if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+  console.error('ERROR: ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required.')
+  console.error('Usage: ADMIN_EMAIL=you@domain.com ADMIN_PASSWORD=YourSecurePass node scripts/create-admin.mjs')
+  process.exit(1)
+}
 
 async function main() {
   const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 12)
@@ -25,11 +31,9 @@ async function main() {
     },
   })
 
-  console.log(`✅ Admin user ready:`)
-  console.log(`   Email   : ${admin.email}`)
-  console.log(`   Password: ${ADMIN_PASSWORD}`)
-  console.log(`   Role    : ${admin.role}`)
-  console.log(`\n👉 Go to http://localhost:3000/login and sign in.`)
+  console.log('Admin user ready:')
+  console.log(`   Email : ${admin.email}`)
+  console.log(`   Role  : ${admin.role}`)
 }
 
 main()

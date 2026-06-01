@@ -103,17 +103,22 @@ const demoPDFs = [
 async function main() {
   console.log('🌱 Seeding KIITHUB database...')
 
-  // Create admin user
-  const admin = await prisma.user.upsert({
-    where: { email: process.env.ADMIN_EMAIL || 'admin@kiithub.com' },
-    update: {},
-    create: {
-      name: 'KIITHUB Admin',
-      email: process.env.ADMIN_EMAIL || 'admin@kiithub.com',
-      role: 'ADMIN',
-    },
-  })
-  console.log(`✅ Admin user: ${admin.email}`)
+  // Create admin user only if ADMIN_EMAIL is configured
+  const adminEmail = process.env.ADMIN_EMAIL
+  if (adminEmail) {
+    const admin = await prisma.user.upsert({
+      where: { email: adminEmail },
+      update: {},
+      create: {
+        name: 'KIITHUB Admin',
+        email: adminEmail,
+        role: 'ADMIN',
+      },
+    })
+    console.log(`Admin user: ${admin.email}`)
+  } else {
+    console.log('Skipping admin user (set ADMIN_EMAIL env var to create one)')
+  }
 
   // Create demo PDFs
   for (const pdf of demoPDFs) {
