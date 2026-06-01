@@ -1,0 +1,43 @@
+version: '3.9'
+
+services:
+  app:
+    build: .
+    ports:
+      - '3000:3000'
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://kiithub:kiithub_secret@db:5432/kiithub
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kiithub
+      POSTGRES_PASSWORD: kiithub_secret
+      POSTGRES_DB: kiithub
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U kiithub']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
