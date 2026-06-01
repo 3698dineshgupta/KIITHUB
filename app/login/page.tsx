@@ -1,6 +1,9 @@
+import { Suspense } from 'react'
 import { LoginForm } from '@/components/auth/login-form'
 import { Metadata } from 'next'
+
 export const metadata: Metadata = { title: 'Login' }
+
 export default function LoginPage() {
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4">
@@ -10,7 +13,9 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold">Welcome back</h1>
           <p className="text-muted-foreground text-sm mt-1">Sign in to your KIIT Hub account</p>
         </div>
-        <LoginForm />
+        <Suspense fallback={<div className="animate-pulse h-64 rounded-xl bg-muted" />}>
+          <LoginForm />
+        </Suspense>
       </div>
     </div>
   )

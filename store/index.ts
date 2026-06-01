@@ -1,9 +1,9 @@
 import { create } from 'zustand'
-import { FilterOptions } from '@/types'
+import { FilterParams } from '@/types'
 
 interface FilterState {
-  filters: FilterOptions
-  setFilters: (filters: Partial<FilterOptions>) => void
+  filters: FilterParams
+  setFilters: (filters: Partial<FilterParams>) => void
   resetFilters: () => void
 }
 

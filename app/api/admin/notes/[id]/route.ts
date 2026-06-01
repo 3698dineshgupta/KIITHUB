@@ -11,21 +11,22 @@ async function requireAdmin(email: string) {
 }
 
 // Update note (isPremium, isPublished, title, etc.)
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const session = await auth()
     if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     await requireAdmin(session.user.email)
 
     const body = await req.json()
-    const allowed = ['isPremium', 'isPublished', 'title', 'description', 'previewPages']
+    const allowed = ['isPremium', 'isPublished', 'title', 'description']
     const data: any = {}
     for (const key of allowed) {
       if (key in body) data[key] = body[key]
     }
 
-    const note = await prisma.note.update({ where: { id: params.id }, data })
-    await cache.del(CACHE_KEYS.noteDetail(params.id))
+    const note = await prisma.note.update({ where: { id }, data })
+    await cache.del(CACHE_KEYS.noteDetail(id))
 
     return NextResponse.json({ success: true, note })
   } catch (err: any) {
@@ -35,13 +36,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 // Delete note (from DB + Telegram)
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const session = await auth()
     if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const admin = await requireAdmin(session.user.email)
 
-    const note = await prisma.note.findUnique({ where: { id: params.id } })
+    const note = await prisma.note.findUnique({ where: { id } })
     if (!note) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     // Delete from Telegram channel
@@ -52,12 +54,12 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     }
 
     // Delete from DB (cascade handles bookmarks, views, downloads)
-    await prisma.note.delete({ where: { id: params.id } })
-    await cache.del(CACHE_KEYS.noteDetail(params.id))
+    await prisma.note.delete({ where: { id } })
+    await cache.del(CACHE_KEYS.noteDetail(id))
 
     // Audit log
     await prisma.auditLog.create({
-      data: { userId: admin.id, action: 'DELETE', resource: 'note', resourceId: params.id },
+      data: { userId: admin.id, action: 'DELETE', resource: 'note', resourceId: id },
     })
 
     return NextResponse.json({ success: true })

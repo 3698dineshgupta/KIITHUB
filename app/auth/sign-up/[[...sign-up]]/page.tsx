@@ -1,9 +1,6 @@
-import { SignUp } from '@clerk/nextjs'
+import { redirect } from 'next/navigation'
 
+// Clerk-style catch-all route — redirect to our NextAuth register page
 export default function SignUpPage() {
-  return (
-    <div className="min-h-screen pt-16 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-slate-900 dark:to-emerald-950 flex items-center justify-center p-4">
-      <SignUp />
-    </div>
-  )
+  redirect('/register')
 }

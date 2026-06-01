@@ -20,7 +20,9 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
         <h1 className="text-3xl font-bold mb-2">Notes & Study Materials</h1>
         <p className="text-muted-foreground">Browse free and premium study materials organized by semester and subject.</p>
       </div>
-      <NotesFilters branches={branches} semesters={semesters} subjects={subjects} />
+      <Suspense fallback={<div className="h-16 animate-pulse rounded-xl bg-muted mb-6" />}>
+        <NotesFilters branches={branches} semesters={semesters} subjects={subjects} />
+      </Suspense>
       <Suspense fallback={<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-6">{Array.from({length:8}).map((_,i)=><Skeleton key={i} className="h-52 rounded-xl"/>)}</div>}>
         <NotesList searchParams={resolvedSearchParams} />
       </Suspense>

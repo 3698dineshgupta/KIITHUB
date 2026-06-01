@@ -4,20 +4,21 @@ import { prisma } from '@/lib/prisma'
 import { telegramStream } from '@/lib/telegram'
 import { isPremiumActive } from '@/lib/utils'
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const token = req.nextUrl.searchParams.get('token')
     if (!token) return NextResponse.json({ error: 'Missing token' }, { status: 401 })
 
     const payload = await verifyStreamToken(token)
-    if (!payload || payload.resourceId !== params.id || payload.resourceType !== 'pyq') {
+    if (!payload || payload.resourceId !== id || payload.resourceType !== 'pyq') {
       return NextResponse.json({ error: 'Invalid token' }, { status: 403 })
     }
 
     const user = await prisma.user.findUnique({ where: { id: payload.userId } })
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 403 })
 
-    const pyq = await prisma.pYQ.findUnique({ where: { id: params.id } })
+    const pyq = await prisma.pYQ.findUnique({ where: { id } })
     if (!pyq || !pyq.isPublished) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     const userIsPremium = isPremiumActive(user.membershipStatus, user.membershipExpiry)
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
     const pdfBuffer = await telegramStream(pyq.telegramFileId)
 
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Length': String(pdfBuffer.length),

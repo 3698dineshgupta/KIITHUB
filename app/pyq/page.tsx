@@ -18,7 +18,9 @@ export default async function PYQPage({ searchParams }: { searchParams: Promise<
         <h1 className="text-3xl font-bold mb-2">Previous Year Questions</h1>
         <p className="text-muted-foreground">Browse PYQs by year, semester, and subject.</p>
       </div>
-      <NotesFilters branches={branches} semesters={semesters} subjects={subjects} />
+      <Suspense fallback={<div className="h-16 animate-pulse rounded-xl bg-muted mb-6" />}>
+        <NotesFilters branches={branches} semesters={semesters} subjects={subjects} />
+      </Suspense>
       <Suspense fallback={<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-6">{Array.from({length:8}).map((_,i)=><Skeleton key={i} className="h-48 rounded-xl"/>)}</div>}>
         <PYQList searchParams={resolvedSearchParams} />
       </Suspense>
