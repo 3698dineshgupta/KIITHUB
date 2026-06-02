@@ -5,6 +5,7 @@ import { NotesFilters } from '@/components/notes/notes-filters'
 import { NotesList } from '@/components/notes/notes-list'
 import { Skeleton } from '@/components/ui/skeleton'
 
+export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: 'Notes & Study Materials', description: 'Browse all notes, lab manuals, assignments and study materials.' }
 
 export default async function NotesPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {

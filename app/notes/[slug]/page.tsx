@@ -16,6 +16,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return { title: note.title, description: note.description ?? `${note.subject.name} notes` }
 }
 
+export const dynamic = "force-dynamic";
 export default async function NoteViewPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const session = await auth()
