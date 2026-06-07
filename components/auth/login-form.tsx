@@ -40,7 +40,7 @@ export function LoginForm() {
       return
     }
 
-    router.push(callbackUrl)
+    window.location.href = callbackUrl
   }
 
   const handleGoogle = async () => {

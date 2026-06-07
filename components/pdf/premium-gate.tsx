@@ -2,10 +2,19 @@ import Link from 'next/link'
 import { Lock, Crown, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { prisma } from '@/lib/prisma'
 
 const benefits = ['All notes & PYQs unlocked','Lab manuals & assignments','Secure offline-style viewer','Ad-free experience']
 
-export function PremiumGate() {
+export async function PremiumGate() {
+  let price = '299'
+  try {
+    const setting = await prisma.setting.findUnique({ where: { key: 'premium_price' } })
+    if (setting) price = setting.value
+  } catch (err) {
+    console.error('Failed to fetch premium_price:', err)
+  }
+
   return (
     <Card className="p-8 text-center border-amber-300 dark:border-amber-700 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30">
       <div className="inline-flex p-4 rounded-full bg-amber-100 dark:bg-amber-900/30 mb-4">
@@ -19,7 +28,7 @@ export function PremiumGate() {
         ))}
       </div>
       <Link href="/premium">
-        <Button variant="premium" size="lg" className="gap-2"><Crown className="h-5 w-5" />Upgrade to Premium — ₹299/year</Button>
+        <Button variant="premium" size="lg" className="gap-2"><Crown className="h-5 w-5" />Upgrade to Premium — ₹{price}/year</Button>
       </Link>
     </Card>
   )

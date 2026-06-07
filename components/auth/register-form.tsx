@@ -46,8 +46,9 @@ export function RegisterForm() {
       await signIn('credentials', {
         email,
         password,
-        callbackUrl: '/dashboard'
+        redirect: false
       })
+      window.location.href = '/dashboard'
 
     } catch (err: any) {
       setError(err.message)
