@@ -31,27 +31,42 @@ export async function NotesList({ searchParams }: { searchParams: Record<string,
 
   const orderBy: any =
     sortBy === 'popular' ? { viewCount: 'desc' } :
-    sortBy === 'downloads' ? { downloadCount: 'desc' } :
     { createdAt: 'desc' }
 
-  const [notes, total] = await Promise.all([
-    prisma.note.findMany({
-      where, orderBy, skip: (page - 1) * LIMIT, take: LIMIT,
-      include: { subject: true, branch: true, semester: true, tags: true },
-    }),
-    prisma.note.count({ where }),
-  ])
+  let notes: any[] = []
+  let total = 0
+
+  try {
+    const results = await Promise.all([
+      prisma.note.findMany({
+        where, orderBy, skip: (page - 1) * LIMIT, take: LIMIT,
+        include: { subject: true, branch: true, semester: true, tags: true },
+      }),
+      prisma.note.count({ where }),
+    ])
+    notes = results[0]
+    total = results[1]
+  } catch (err) {
+    console.error('Failed to fetch notes:', err)
+    return (
+      <div className="text-center py-16 text-destructive">
+        <p className="text-lg font-medium mb-2">Error loading notes</p>
+        <p className="text-sm">Please try refreshing the page.</p>
+      </div>
+    )
+  }
 
   // Attach bookmark status for signed-in users
   let bookmarkedIds = new Set<string>()
-  if (session?.user) {
-    const user = await prisma.user.findUnique({ where: { email: session.user.email! } })
-    if (user) {
+  if (session?.user?.id) {
+    try {
       const bks = await prisma.bookmark.findMany({
-        where: { userId: user.id, noteId: { in: notes.map(n => n.id) } },
+        where: { userId: session.user.id, noteId: { in: notes.map(n => n.id) } },
         select: { noteId: true },
       })
       bookmarkedIds = new Set(bks.map(b => b.noteId!))
+    } catch (err) {
+      console.error('Failed to fetch bookmarks:', err)
     }
   }
 

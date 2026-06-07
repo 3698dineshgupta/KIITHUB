@@ -5,9 +5,25 @@ import { AdminSidebar } from '@/components/admin/admin-sidebar'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
-  if (!session?.user?.email) redirect('/login?callbackUrl=/admin')
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  if (!session?.user?.id) redirect('/login?callbackUrl=/admin')
+
+  // Fast-path: role is already embedded in the JWT — skip DB call if not ADMIN
+  const sessionRole = (session.user as any).role
+  if (sessionRole && sessionRole !== 'ADMIN') redirect('/')
+
+  let user = null
+  try {
+    user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { id: true, name: true, role: true },
+    })
+  } catch (error) {
+    console.error('Database error in AdminLayout:', error)
+    redirect('/?error=Database_Unavailable')
+  }
+
   if (!user || user.role !== 'ADMIN') redirect('/')
+
   return (
     <div className="flex h-screen bg-muted/20 overflow-hidden">
       <AdminSidebar userName={user.name} />

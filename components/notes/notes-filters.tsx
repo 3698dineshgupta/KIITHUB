@@ -98,7 +98,6 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
           <SelectContent>
             <SelectItem value="latest">Latest</SelectItem>
             <SelectItem value="popular">Most Viewed</SelectItem>
-            <SelectItem value="downloads">Most Downloaded</SelectItem>
           </SelectContent>
         </Select>
 

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyStreamToken } from '@/lib/jwt'
 import { prisma } from '@/lib/prisma'
-import { telegramStream } from '@/lib/telegram'
+import { telegramStream, telegramGetFileUrl } from '@/lib/telegram'
+import { cache, CACHE_KEYS } from '@/lib/redis'
 import { isPremiumActive } from '@/lib/utils'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -26,7 +27,30 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: 'Premium required' }, { status: 403 })
     }
 
-    const pdfBuffer = await telegramStream(pyq.telegramFileId)
+    // Check Redis cache for Telegram file URL
+    const cacheKey = CACHE_KEYS.telegramUrl(pyq.telegramFileId)
+    let pdfBuffer: Buffer
+
+    const cachedUrl = await cache.get<string>(cacheKey)
+    if (cachedUrl) {
+      try {
+        const res = await fetch(cachedUrl)
+        if (res.ok) {
+          pdfBuffer = Buffer.from(await res.arrayBuffer())
+        } else {
+          const freshUrl = await telegramGetFileUrl(pyq.telegramFileId)
+          await cache.set(cacheKey, freshUrl, 3300)
+          pdfBuffer = await telegramStream(pyq.telegramFileId)
+        }
+      } catch (e) {
+        console.warn('Cached Telegram URL fetch error, falling back to direct stream:', e)
+        pdfBuffer = await telegramStream(pyq.telegramFileId)
+      }
+    } else {
+      const freshUrl = await telegramGetFileUrl(pyq.telegramFileId)
+      await cache.set(cacheKey, freshUrl, 3300)
+      pdfBuffer = await telegramStream(pyq.telegramFileId)
+    }
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
@@ -35,10 +59,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         'Cache-Control': 'private, no-store, no-cache',
         'Content-Disposition': `inline; filename="${encodeURIComponent(pyq.title)}.pdf"`,
         'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'SAMEORIGIN',
       },
     })
-  } catch (err) {
+  } catch (err: any) {
+    const msg = String(err?.message ?? '')
+    if (msg.includes("Can't reach database") || msg.includes('PrismaClientInitializationError') || msg.includes('Database unavailable')) {
+      console.error('stream/pyq GET DB error:', err)
+      return NextResponse.json({ success: false, error: 'Service temporarily unavailable', code: 503 }, { status: 503 })
+    }
     console.error('PYQ stream error:', err)
-    return NextResponse.json({ error: 'Stream failed' }, { status: 500 })
+    return NextResponse.json({ success: false, error: 'Stream failed', code: 500 }, { status: 500 })
   }
 }

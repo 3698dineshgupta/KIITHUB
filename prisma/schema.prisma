@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum Role {
@@ -272,6 +273,8 @@ model PaymentRequest {
   approvedById   String?
   approvedAt     DateTime?
   membershipDays Int           @default(365)
+  telegramSent   Boolean       @default(true)
+  telegramError  String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)

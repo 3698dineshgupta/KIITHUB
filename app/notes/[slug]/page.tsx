@@ -1,4 +1,5 @@
 import { notFound, redirect } from 'next/navigation'
+import Link from 'next/link'
 import { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
@@ -26,7 +27,9 @@ export default async function NoteViewPage({ params }: { params: Promise<{ slug:
   })
   if (!note || !note.isPublished) notFound()
 
-  const user = session?.user ? await prisma.user.findUnique({ where: { email: session.user.email! } }) : null
+  const user = session?.user?.id
+    ? await prisma.user.findUnique({ where: { id: session.user.id } }).catch(() => null)
+    : null
   const userIsPremium = user ? isPremiumActive(user.membershipStatus, user.membershipExpiry) : false
 
   // If premium note and no access → show gate
@@ -70,7 +73,7 @@ export default async function NoteViewPage({ params }: { params: Promise<{ slug:
       ) : (
         <div className="rounded-xl border p-8 text-center">
           <p className="font-medium mb-3">Sign in to view this PDF</p>
-          <a href="/login" className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90">Sign in</a>
+          <Link href="/login" className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90">Sign in</Link>
         </div>
       )}
     </div>

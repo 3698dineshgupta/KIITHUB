@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { signStreamToken } from '@/lib/jwt'
@@ -35,7 +36,7 @@ export default async function PYQViewPage({ params }: { params: Promise<{ slug: 
       <NoteMetaCard note={{ ...pyq, contentType: 'PYQ', tags: [] }} />
       {streamToken
         ? <PDFViewer streamUrl={`/api/stream/pyq/${pyq.id}?token=${streamToken}`} title={pyq.title} isPremium={pyq.isPremium} userEmail={user?.email ?? ''} />
-        : <div className="rounded-xl border p-8 text-center"><p className="font-medium mb-3">Sign in to view this PYQ</p><a href="/login" className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium">Sign in</a></div>
+        : <div className="rounded-xl border p-8 text-center"><p className="font-medium mb-3">Sign in to view this PYQ</p><Link href="/login" className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium">Sign in</Link></div>
       }
     </div>
   )

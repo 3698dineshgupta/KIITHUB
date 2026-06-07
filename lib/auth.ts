@@ -65,10 +65,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.sessionId = sessionId
         await cache.set(`user:session:${user.id}`, sessionId, 60 * 60 * 24 * 30)
       } else if (token.id && token.sessionId) {
-        // Validate active session
-        const activeSessionId = await cache.get(`user:session:${token.id}`)
-        if (activeSessionId && activeSessionId !== token.sessionId) {
-          return {} // Invalidate token instantly
+        // Validate active session - throttled to at most once every 5 minutes to prevent blocking page transitions on slow Redis queries
+        const lastChecked = token.lastChecked as number | undefined
+        const now = Date.now()
+        if (!lastChecked || now - lastChecked > 300000) {
+          const activeSessionId = await cache.get<string>(`user:session:${token.id}`)
+          if (activeSessionId && activeSessionId !== token.sessionId) {
+            return {} // Invalidate token instantly
+          }
+          token.lastChecked = now
         }
       }
       // Refresh user data on session update

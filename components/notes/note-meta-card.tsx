@@ -1,6 +1,6 @@
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Eye, Download, BookOpen, Calendar, HardDrive, FileText, Crown } from 'lucide-react'
+import { Eye, BookOpen, Calendar, HardDrive, FileText, Crown } from 'lucide-react'
 import { formatDate, formatBytes } from '@/lib/utils'
 
 const TYPE_LABELS: Record<string, string> = { NOTE:'Note', PYQ:'PYQ', SYLLABUS:'Syllabus', LAB_MANUAL:'Lab Manual', ASSIGNMENT:'Assignment' }
@@ -23,7 +23,6 @@ export function NoteMetaCard({ note }: { note: any }) {
       <div className="flex flex-wrap gap-6 mt-4 pt-4 border-t text-sm text-muted-foreground">
         <span className="flex items-center gap-1.5"><BookOpen className="h-4 w-4" />{note.subject?.name}</span>
         <span className="flex items-center gap-1.5"><Eye className="h-4 w-4" />{note.viewCount} views</span>
-        <span className="flex items-center gap-1.5"><Download className="h-4 w-4" />{note.downloadCount} downloads</span>
         {note.fileSize && <span className="flex items-center gap-1.5"><HardDrive className="h-4 w-4" />{formatBytes(note.fileSize)}</span>}
         {note.totalPages && <span className="flex items-center gap-1.5"><FileText className="h-4 w-4" />{note.totalPages} pages</span>}
         <span className="flex items-center gap-1.5"><Calendar className="h-4 w-4" />{formatDate(note.createdAt)}</span>

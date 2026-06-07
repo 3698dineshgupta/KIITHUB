@@ -3,7 +3,7 @@ import { Lock, Crown, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 
-const benefits = ['All notes & PYQs unlocked','Lab manuals & assignments','Unlimited downloads','Ad-free experience']
+const benefits = ['All notes & PYQs unlocked','Lab manuals & assignments','Secure offline-style viewer','Ad-free experience']
 
 export function PremiumGate() {
   return (

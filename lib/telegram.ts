@@ -3,7 +3,7 @@
  * PDFs stored in private Telegram channel — file URLs NEVER exposed to frontend
  */
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!
-const CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID!
+const CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID || process.env.TELEGRAM_CHAT_ID || ''
 const API = `https://api.telegram.org/bot${BOT_TOKEN}`
 const FILE_API = `https://api.telegram.org/file/bot${BOT_TOKEN}`
 
@@ -45,4 +45,43 @@ export async function telegramDelete(messageId: string): Promise<boolean> {
     body: JSON.stringify({ chat_id: CHANNEL_ID, message_id: parseInt(messageId) })
   })
   return (await res.json()).ok
+}
+
+export async function sendPaymentProofToTelegram(args: {
+  userName: string
+  userEmail: string
+  transactionId: string
+  amount: number
+  membershipDays: number
+  date: string
+  screenshot: File
+  notes?: string | null
+}): Promise<boolean> {
+  try {
+    const formData = new FormData()
+    formData.append('chat_id', CHANNEL_ID)
+    
+    // Format requested exactly by the user
+    const caption = `New Premium Payment Request\n\nUser Name:\n${args.userName}\n\nEmail:\n${args.userEmail}\n\nTransaction ID:\n${args.transactionId}\n\nAmount:\n₹${args.amount}\n\nMembership Duration:\n${args.membershipDays} Days\n\nDate:\n${args.date}${args.notes ? `\n\nNotes:\n${args.notes}` : ''}`
+    
+    formData.append('caption', caption)
+    
+    const buffer = Buffer.from(await args.screenshot.arrayBuffer())
+    const blob = new Blob([buffer], { type: args.screenshot.type })
+    formData.append('photo', blob, args.screenshot.name)
+
+    const res = await fetch(`${API}/sendPhoto`, {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!res.ok) {
+      console.error('Telegram sendPhoto error:', await res.text())
+      return false
+    }
+    return true
+  } catch (error) {
+    console.error('Telegram payment proof error:', error)
+    return false
+  }
 }

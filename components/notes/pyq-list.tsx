@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Eye, Download, Crown, Lock, FileText, Calendar } from 'lucide-react'
+import { Eye, Crown, Lock, FileText, Calendar } from 'lucide-react'
 import { formatRelativeTime } from '@/lib/utils'
 
 const LIMIT = 12
@@ -31,7 +31,6 @@ export async function PYQList({ searchParams }: { searchParams: Record<string, s
 
   const orderBy: any =
     sortBy === 'popular' ? { viewCount: 'desc' } :
-    sortBy === 'downloads' ? { downloadCount: 'desc' } :
     sortBy === 'year' ? { year: 'desc' } :
     { createdAt: 'desc' }
 
@@ -100,7 +99,6 @@ export async function PYQList({ searchParams }: { searchParams: Record<string, s
                 <div className="flex items-center justify-between text-xs text-muted-foreground mt-auto pt-3 border-t">
                   <div className="flex items-center gap-3">
                     <span className="flex items-center gap-1"><Eye className="h-3 w-3" />{pyq.viewCount}</span>
-                    <span className="flex items-center gap-1"><Download className="h-3 w-3" />{pyq.downloadCount}</span>
                   </div>
                   {pyq.isPremium && <Lock className="h-3 w-3 text-amber-500" />}
                 </div>

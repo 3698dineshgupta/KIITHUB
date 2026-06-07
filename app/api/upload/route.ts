@@ -131,8 +131,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, note })
   } catch (err: any) {
-    if (err.name === 'ZodError') return NextResponse.json({ error: err.errors[0].message }, { status: 400 })
+    if (err?.name === 'ZodError') return NextResponse.json({ success: false, error: err.errors[0].message, code: 400 }, { status: 400 })
+    const msg = String(err?.message ?? '')
+    if (msg.includes("Can't reach database") || msg.includes('PrismaClientInitializationError') || msg.includes('Database unavailable')) {
+      console.error('Upload DB error:', err)
+      return NextResponse.json({ success: false, error: 'Service temporarily unavailable', code: 503 }, { status: 503 })
+    }
     console.error('Upload error:', err)
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
+    return NextResponse.json({ success: false, error: 'Upload failed', code: 500 }, { status: 500 })
   }
 }

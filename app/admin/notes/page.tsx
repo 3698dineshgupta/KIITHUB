@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import Link from 'next/link'
 import { AdminNotesTable } from '@/components/admin/notes-table'
 export default async function AdminNotesPage({ searchParams }: { searchParams: Promise<Record<string,string>> }) {
   const resolvedSearchParams = await searchParams
@@ -15,7 +16,7 @@ export default async function AdminNotesPage({ searchParams }: { searchParams: P
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-bold">Notes & PYQs</h1><p className="text-muted-foreground">{total} total materials</p></div>
-        <a href="/admin/upload" className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90">+ Upload PDF</a>
+        <Link href="/admin/upload" className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90">+ Upload PDF</Link>
       </div>
       <AdminNotesTable notes={notes} total={total} page={page} />
     </div>

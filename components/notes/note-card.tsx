@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Eye, Download, BookOpen, Lock, Crown, Bookmark, BookmarkCheck } from 'lucide-react'
+import { Eye, BookOpen, Lock, Crown, Bookmark, BookmarkCheck } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn, formatRelativeTime, formatBytes } from '@/lib/utils'
@@ -77,8 +77,7 @@ export function NoteCard({ note, showBookmark = false }: NoteCardProps) {
 
           <div className="flex items-center justify-between text-xs text-muted-foreground mt-auto pt-3 border-t">
             <div className="flex items-center gap-3">
-              <span className="flex items-center gap-1"><Eye className="h-3 w-3" />{note.viewCount}</span>
-              <span className="flex items-center gap-1"><Download className="h-3 w-3" />{note.downloadCount}</span>
+              <span className="flex items-center gap-1"><Eye className="h-3 w-3" />{note.viewCount} views</span>
             </div>
             <div className="flex items-center gap-2">
               {note.fileSize && <span>{formatBytes(note.fileSize)}</span>}

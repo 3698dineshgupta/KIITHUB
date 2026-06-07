@@ -9,6 +9,17 @@ export default auth((req) => {
   if (isProtected && !req.auth) {
     return NextResponse.redirect(new URL(`/login?callbackUrl=${encodeURIComponent(pathname)}`, req.url))
   }
+
+  // Restrict /admin routes to ADMIN role only
+  if (pathname.startsWith('/admin')) {
+    // `req.auth` typings vary; safely read role from either `user` or `token`
+    const authAny = req.auth as any
+    const role = authAny?.user?.role || authAny?.token?.role
+    if (role !== 'ADMIN') {
+      // If unauthenticated, redirect to login (handled above). If authenticated but not admin, send to home.
+      return NextResponse.redirect(new URL('/', req.url))
+    }
+  }
   return NextResponse.next()
 })
 

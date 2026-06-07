@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyStreamToken } from '@/lib/jwt'
 import { prisma } from '@/lib/prisma'
-import { telegramStream } from '@/lib/telegram'
+import { telegramStream, telegramGetFileUrl } from '@/lib/telegram'
 import { cache, CACHE_KEYS } from '@/lib/redis'
 import { isPremiumActive } from '@/lib/utils'
 
@@ -39,14 +39,23 @@ export async function GET(
 
     const cachedUrl = await cache.get<string>(cacheKey)
     if (cachedUrl) {
-      const res = await fetch(cachedUrl)
-      if (res.ok) {
-        pdfBuffer = Buffer.from(await res.arrayBuffer())
-      } else {
-        // URL expired — fetch fresh
+      try {
+        const res = await fetch(cachedUrl)
+        if (res.ok) {
+          pdfBuffer = Buffer.from(await res.arrayBuffer())
+        } else {
+          // URL expired — fetch fresh and cache it
+          const freshUrl = await telegramGetFileUrl(note.telegramFileId)
+          await cache.set(cacheKey, freshUrl, 3300)
+          pdfBuffer = await telegramStream(note.telegramFileId)
+        }
+      } catch (e) {
+        console.warn('Cached Telegram URL fetch error, falling back to direct stream:', e)
         pdfBuffer = await telegramStream(note.telegramFileId)
       }
     } else {
+      const freshUrl = await telegramGetFileUrl(note.telegramFileId)
+      await cache.set(cacheKey, freshUrl, 3300)
       pdfBuffer = await telegramStream(note.telegramFileId)
     }
 
@@ -60,8 +69,13 @@ export async function GET(
         'X-Frame-Options': 'SAMEORIGIN',
       },
     })
-  } catch (err) {
+  } catch (err: any) {
+    const msg = String(err?.message ?? '')
+    if (msg.includes("Can't reach database") || msg.includes('PrismaClientInitializationError') || msg.includes('Database unavailable')) {
+      console.error('stream/note GET DB error:', err)
+      return NextResponse.json({ success: false, error: 'Service temporarily unavailable', code: 503 }, { status: 503 })
+    }
     console.error('Stream error:', err)
-    return NextResponse.json({ error: 'Stream failed' }, { status: 500 })
+    return NextResponse.json({ success: false, error: 'Stream failed', code: 500 }, { status: 500 })
   }
 }

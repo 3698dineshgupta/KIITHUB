@@ -40,7 +40,7 @@ function GradeSelector({ value, onChange }: { value: string; onChange: (v: strin
 
 function SGPACalculator() {
   const [subjects, setSubjects] = useState<SGPASubject[]>([emptySubject(), emptySubject(), emptySubject()])
-  const sgpa = calculateSGPA(subjects.filter(s => s.name && s.credits > 0))
+  const sgpa = calculateSGPA(subjects.filter(s => s.credits > 0))
 
   const update = (i: number, field: keyof SGPASubject, value: any) => {
     setSubjects(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: value } : s))
@@ -50,7 +50,7 @@ function SGPACalculator() {
   const reset = () => setSubjects([emptySubject(), emptySubject(), emptySubject()])
 
   const gradeMap = Object.fromEntries(GRADE_POINTS.map(g => [g.grade, g.points]))
-  const totalCredits = subjects.filter(s => s.name).reduce((a, s) => a + s.credits, 0)
+  const totalCredits = subjects.filter(s => s.credits > 0).reduce((a, s) => a + s.credits, 0)
 
   return (
     <div className="space-y-6">
@@ -60,7 +60,7 @@ function SGPACalculator() {
           {sgpa > 0 ? sgpa.toFixed(2) : '—'}
         </div>
         <div className="text-xl font-semibold mb-1">SGPA</div>
-        <div className="text-sm text-muted-foreground">{totalCredits} total credits · {subjects.filter(s => s.name).length} subjects</div>
+        <div className="text-sm text-muted-foreground">{totalCredits} total credits · {subjects.filter(s => s.credits > 0).length} subjects</div>
         {sgpa >= 9 && <Badge className="mt-3 bg-emerald-600">Outstanding!</Badge>}
         {sgpa >= 8 && sgpa < 9 && <Badge className="mt-3 bg-blue-600">Excellent</Badge>}
         {sgpa >= 7 && sgpa < 8 && <Badge className="mt-3 bg-amber-600">Good</Badge>}
@@ -106,7 +106,7 @@ function SGPACalculator() {
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground">
                           Points: <strong>{gradeMap[sub.grade] ?? 0}</strong>
-                          {sub.name && <> · Weighted: <strong>{((gradeMap[sub.grade] ?? 0) * sub.credits).toFixed(0)}</strong></>}
+                          <> · Weighted: <strong>{((gradeMap[sub.grade] ?? 0) * sub.credits).toFixed(0)}</strong></>
                         </span>
                       </div>
                     </div>
