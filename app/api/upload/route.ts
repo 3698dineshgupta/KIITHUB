@@ -98,6 +98,38 @@ export async function POST(req: NextRequest) {
     const baseSlug = slugify(meta.title)
     let slug = baseSlug
     let attempt = 0
+
+    if (meta.contentType === 'PYQ') {
+      while (await prisma.pYQ.findUnique({ where: { slug } })) {
+        attempt++
+        slug = `${baseSlug}-${attempt}`
+      }
+      const pyq = await prisma.pYQ.create({
+        data: {
+          title: meta.title,
+          slug,
+          description: meta.description,
+          year: meta.year || new Date().getFullYear(),
+          examType: meta.examType || 'End Semester',
+          subjectId: dbSubject.id,
+          branchId: dbBranch.id,
+          semesterId: dbSemester.id,
+          academicBranch: meta.academicBranch,
+          academicSemester: meta.academicSemester,
+          classYear: meta.classYear,
+          isPremium: meta.isPremium,
+          telegramFileId: tgResult.fileId,
+          telegramMsgId: tgResult.messageId,
+          fileSize: tgResult.fileSize,
+          uploadedById: user.id,
+        },
+      })
+      await prisma.auditLog.create({
+        data: { userId: user.id, action: 'UPLOAD', resource: 'pyq', resourceId: pyq.id },
+      })
+      return NextResponse.json({ success: true, pyq })
+    }
+
     while (await prisma.note.findUnique({ where: { slug } })) {
       attempt++
       slug = `${baseSlug}-${attempt}`

@@ -15,9 +15,9 @@ async function getHomeData() {
       prisma.note.findMany({ where: { isPublished: true }, orderBy: { createdAt: 'desc' }, take: 8, include: { subject: true, branch: true, semester: true, tags: true } }),
       prisma.note.findMany({ where: { isPublished: true }, orderBy: { viewCount: 'desc' }, take: 4, include: { subject: true, branch: true, semester: true, tags: true } }),
       prisma.semester.findMany({ orderBy: { number: 'asc' }, include: { _count: { select: { notes: true, pyqs: true } } } }),
-      prisma.$transaction([prisma.user.count(), prisma.note.count(), prisma.pYQ.count(), prisma.download.count()]),
+      prisma.$transaction([prisma.user.count(), prisma.note.count(), prisma.pYQ.count(), prisma.view.count()]),
     ])
-    const data = { latestNotes, topNotes, semesters, stats: { users: stats[0], notes: stats[1], pyqs: stats[2], downloads: stats[3] } }
+    const data = { latestNotes, topNotes, semesters, stats: { users: stats[0], notes: stats[1], pyqs: stats[2], views: stats[3] } }
     await cache.set('home:data', data, 1800)
     return data
   } catch (err) {
