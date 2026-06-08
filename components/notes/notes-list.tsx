@@ -14,6 +14,7 @@ export async function NotesList({ searchParams }: { searchParams: Record<string,
   const branchId = searchParams.branch
   const semesterId = searchParams.semester
   const contentType = searchParams.type as ContentType | undefined
+  const subjectId = searchParams.subject
   const sortBy = searchParams.sort ?? 'latest'
 
   const where: any = { isPublished: true }
@@ -28,6 +29,7 @@ export async function NotesList({ searchParams }: { searchParams: Record<string,
   if (branchId) where.branchId = branchId
   if (semesterId) where.semesterId = semesterId
   if (contentType) where.contentType = contentType
+  if (subjectId) where.subjectId = subjectId
 
   const orderBy: any =
     sortBy === 'popular' ? { viewCount: 'desc' } :

@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,19 @@ export function ProfileForm({ user }: { user: any }) {
   const [university, setUniversity] = useState(user.university ?? '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [premiumPrice, setPremiumPrice] = useState('299')
   const premium = isPremiumActive(user.membershipStatus, user.membershipExpiry)
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const res = await fetch('/api/admin/settings', { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json()
+        if (data?.premium_price) setPremiumPrice(String(data.premium_price))
+      } catch {}
+    })()
+  }, [])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,7 +63,7 @@ export function ProfileForm({ user }: { user: any }) {
             </p>
           </div>
           {!premium && user.membershipStatus !== 'PENDING' && (
-            <Link href="/premium"><Button variant="premium" size="sm" className="gap-2"><Crown className="h-4 w-4"/>Upgrade — ₹299/yr</Button></Link>
+            <Link href="/premium"><Button variant="premium" size="sm" className="gap-2"><Crown className="h-4 w-4"/>Upgrade — ₹{premiumPrice}/yr</Button></Link>
           )}
         </CardContent>
       </Card>

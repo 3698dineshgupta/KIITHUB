@@ -81,6 +81,16 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
           </SelectContent>
         </Select>
 
+        <Select value={sp.get('subject') ?? ''} onValueChange={v => updateParam('subject', v === 'all' ? null : v)}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Subject" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Subjects</SelectItem>
+            {filteredSubjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+
         {pathname.includes('/pyq') ? (
           <Select value={sp.get('examType') ?? ''} onValueChange={v => updateParam('examType', v === 'all' ? null : v)}>
             <SelectTrigger className="w-40">

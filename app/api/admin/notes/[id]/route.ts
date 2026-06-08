@@ -33,8 +33,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     
     await cache.del(CACHE_KEYS.noteDetail(id))
+    await cache.del('home:data')
 
-    return NextResponse.json({ success: true, note })
+    return NextResponse.json({ success: true, note: item })
   } catch (err: any) {
     if (err.message === 'Forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     return NextResponse.json({ error: 'Update failed' }, { status: 500 })
@@ -75,6 +76,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     }
     
     await cache.del(CACHE_KEYS.noteDetail(id))
+    await cache.del('home:data')
 
     // Audit log
     await prisma.auditLog.create({
