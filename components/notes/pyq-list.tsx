@@ -16,6 +16,7 @@ export async function PYQList({ searchParams }: { searchParams: Record<string, s
   const branchId = searchParams.branch
   const semesterId = searchParams.semester
   const year = searchParams.year ? parseInt(searchParams.year) : undefined
+  const examType = searchParams.examType
   const sortBy = searchParams.sort ?? 'latest'
 
   const where: any = { isPublished: true }
@@ -28,6 +29,7 @@ export async function PYQList({ searchParams }: { searchParams: Record<string, s
   if (branchId) where.branchId = branchId
   if (semesterId) where.semesterId = semesterId
   if (year) where.year = year
+  if (examType) where.examType = examType
 
   const orderBy: any =
     sortBy === 'popular' ? { viewCount: 'desc' } :

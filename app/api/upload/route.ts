@@ -127,6 +127,8 @@ export async function POST(req: NextRequest) {
       await prisma.auditLog.create({
         data: { userId: user.id, action: 'UPLOAD', resource: 'pyq', resourceId: pyq.id },
       })
+      const { cache } = await import('@/lib/redis')
+      await cache.del('home:data')
       return NextResponse.json({ success: true, pyq })
     }
 
@@ -160,6 +162,9 @@ export async function POST(req: NextRequest) {
     await prisma.auditLog.create({
       data: { userId: user.id, action: 'UPLOAD', resource: 'note', resourceId: note.id },
     })
+
+    const { cache } = await import('@/lib/redis')
+    await cache.del('home:data')
 
     return NextResponse.json({ success: true, note })
   } catch (err: any) {

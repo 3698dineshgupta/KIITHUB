@@ -5,20 +5,31 @@ export default async function AdminNotesPage({ searchParams }: { searchParams: P
   const resolvedSearchParams = await searchParams
   const page = parseInt(resolvedSearchParams.page ?? '1')
   const LIMIT = 20
-  const [notes, total] = await Promise.all([
+  const [notes, notesCount, pyqs, pyqsCount] = await Promise.all([
     prisma.note.findMany({
-      orderBy: { createdAt: 'desc' }, skip: (page-1)*LIMIT, take: LIMIT,
       include: { subject: { select:{name:true} }, branch: { select:{shortName:true} }, semester: { select:{number:true} } },
     }),
     prisma.note.count(),
+    prisma.pYQ.findMany({
+      include: { subject: { select:{name:true} }, branch: { select:{shortName:true} }, semester: { select:{number:true} } },
+    }),
+    prisma.pYQ.count(),
   ])
+
+  const combined = [
+    ...notes,
+    ...pyqs.map(p => ({ ...p, contentType: 'PYQ' }))
+  ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+
+  const paginatedNotes = combined.slice((page - 1) * LIMIT, page * LIMIT)
+  const total = notesCount + pyqsCount
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-bold">Notes & PYQs</h1><p className="text-muted-foreground">{total} total materials</p></div>
         <Link href="/admin/upload" className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90">+ Upload PDF</Link>
       </div>
-      <AdminNotesTable notes={notes} total={total} page={page} />
+      <AdminNotesTable notes={paginatedNotes} total={total} page={page} />
     </div>
   )
 }

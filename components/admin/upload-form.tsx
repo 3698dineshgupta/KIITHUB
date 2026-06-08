@@ -38,6 +38,7 @@ export function AdminUploadForm({ branches, semesters, subjects }: Props) {
   const [classYear, setClassYear] = useState('')
   const [subjectName, setSubjectName] = useState('')
   const [contentType, setContentType] = useState('NOTE')
+  const [examType, setExamType] = useState('End Semester')
   const [isPremium, setIsPremium] = useState(false)
   const [tags, setTags] = useState('')
 
@@ -57,7 +58,7 @@ export function AdminUploadForm({ branches, semesters, subjects }: Props) {
       form.append('file', file)
       form.append('meta', JSON.stringify({
         title, description, subjectName, academicBranch, academicSemester, classYear,
-        contentType, isPremium,
+        contentType, examType: contentType === 'PYQ' ? examType : undefined, isPremium,
         tags: tags.split(',').map(t => t.trim()).filter(Boolean),
       }))
 
@@ -202,6 +203,19 @@ export function AdminUploadForm({ branches, semesters, subjects }: Props) {
               </div>
             </div>
           </div>
+
+          {contentType === 'PYQ' && (
+            <div>
+              <Label className="mb-2 block">Exam Type</Label>
+              <Select value={examType} onValueChange={setExamType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Mid Semester">Mid Semester</SelectItem>
+                  <SelectItem value="End Semester">End Semester</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Tags */}
           <div>

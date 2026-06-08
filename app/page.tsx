@@ -23,7 +23,7 @@ async function getHomeData() {
   } catch (err) {
     // If DB is unreachable, return a safe fallback so the homepage doesn't crash.
     console.error('getHomeData error:', err)
-    return { latestNotes: [], topNotes: [], semesters: [], stats: { users: 0, notes: 0, pyqs: 0, downloads: 0 } }
+    return { latestNotes: [], topNotes: [], semesters: [], stats: { users: 0, notes: 0, pyqs: 0, views: 0 } }
   }
 }
 

@@ -81,15 +81,28 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
           </SelectContent>
         </Select>
 
-        <Select value={sp.get('type') ?? ''} onValueChange={v => updateParam('type', v === 'all' ? null : v)}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Content Type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            {CONTENT_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {pathname.includes('/pyq') ? (
+          <Select value={sp.get('examType') ?? ''} onValueChange={v => updateParam('examType', v === 'all' ? null : v)}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Exam Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Exams</SelectItem>
+              <SelectItem value="Mid Semester">Mid Semester</SelectItem>
+              <SelectItem value="End Semester">End Semester</SelectItem>
+            </SelectContent>
+          </Select>
+        ) : (
+          <Select value={sp.get('type') ?? ''} onValueChange={v => updateParam('type', v === 'all' ? null : v)}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Content Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              {CONTENT_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
 
         <Select value={sp.get('sort') ?? 'latest'} onValueChange={v => updateParam('sort', v)}>
           <SelectTrigger className="w-36">

@@ -25,7 +25,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (key in body) data[key] = body[key]
     }
 
-    const note = await prisma.note.update({ where: { id }, data })
+    let item: any
+    try {
+      item = await prisma.note.update({ where: { id }, data })
+    } catch {
+      item = await prisma.pYQ.update({ where: { id }, data })
+    }
+    
     await cache.del(CACHE_KEYS.noteDetail(id))
 
     return NextResponse.json({ success: true, note })
@@ -43,23 +49,36 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const admin = await requireAdmin(session.user.email)
 
-    const note = await prisma.note.findUnique({ where: { id } })
-    if (!note) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    let note = await prisma.note.findUnique({ where: { id } })
+    let pyq = null
+    if (!note) {
+      pyq = await prisma.pYQ.findUnique({ where: { id } })
+    }
+    
+    if (!note && !pyq) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    const target = note || pyq
+    const resourceType = note ? 'note' : 'pyq'
 
     // Delete from Telegram channel
     try {
-      await telegramDelete(note.telegramMsgId)
+      await telegramDelete(target!.telegramMsgId)
     } catch (e) {
       console.warn('Telegram delete failed (file may already be gone):', e)
     }
 
-    // Delete from DB (cascade handles bookmarks, views, downloads)
-    await prisma.note.delete({ where: { id } })
+    // Delete from DB
+    if (note) {
+      await prisma.note.delete({ where: { id } })
+    } else if (pyq) {
+      await prisma.pYQ.delete({ where: { id } })
+    }
+    
     await cache.del(CACHE_KEYS.noteDetail(id))
 
     // Audit log
     await prisma.auditLog.create({
-      data: { userId: admin.id, action: 'DELETE', resource: 'note', resourceId: id },
+      data: { userId: admin.id, action: 'DELETE', resource: resourceType, resourceId: id },
     })
 
     return NextResponse.json({ success: true })
