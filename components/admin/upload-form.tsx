@@ -50,6 +50,12 @@ export function AdminUploadForm({ branches, semesters, subjects }: Props) {
       return
     }
 
+    if (file.size > 50 * 1024 * 1024) {
+      setErrorMsg('File exceeds 50MB limit')
+      setStatus('error')
+      return
+    }
+
     setUploading(true)
     setStatus('idle')
 
@@ -63,15 +69,31 @@ export function AdminUploadForm({ branches, semesters, subjects }: Props) {
       }))
 
       const res = await fetch('/api/upload', { method: 'POST', body: form })
-      const data = await res.json()
+      let data;
+      try {
+        data = await res.json()
+      } catch (err) {
+        throw new Error(res.status === 413 ? 'File exceeds 50MB limit' : 'Upload failed')
+      }
 
-      if (!res.ok) throw new Error(data.error || 'Upload failed')
+      if (!res.ok) {
+        const errMsg = data?.error || 'Upload failed'
+        if (errMsg.includes('50MB') || errMsg.includes('too large')) {
+          throw new Error('File exceeds 50MB limit')
+        }
+        throw new Error('Upload failed')
+      }
 
       setStatus('success')
       setTitle(''); setDescription(''); setSubjectName(''); setAcademicBranch(''); setAcademicSemester(''); setClassYear(''); setTags(''); setFile(null)
       setTimeout(() => router.push('/admin/notes'), 2000)
     } catch (err: any) {
-      setErrorMsg(err.message)
+      const msg = err.message || ''
+      if (msg.includes('50MB') || msg.includes('too large') || msg.includes('413')) {
+        setErrorMsg('File exceeds 50MB limit')
+      } else {
+        setErrorMsg('Upload failed')
+      }
       setStatus('error')
     } finally {
       setUploading(false)
@@ -87,7 +109,7 @@ export function AdminUploadForm({ branches, semesters, subjects }: Props) {
         {status === 'success' && (
           <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 mb-6">
             <CheckCircle className="h-5 w-5 flex-shrink-0" />
-            <span className="text-sm">PDF uploaded to Telegram successfully! Redirecting...</span>
+            <span className="text-sm">Upload successful</span>
           </div>
         )}
         {status === 'error' && (
@@ -224,7 +246,7 @@ export function AdminUploadForm({ branches, semesters, subjects }: Props) {
           </div>
 
           <Button type="submit" disabled={uploading} className="w-full gap-2" size="lg">
-            {uploading ? <><Loader2 className="h-5 w-5 animate-spin" />Uploading to Telegram...</> : <><Upload className="h-5 w-5" />Upload PDF</>}
+            {uploading ? <><Loader2 className="h-5 w-5 animate-spin" />Uploading...</> : <><Upload className="h-5 w-5" />Upload PDF</>}
           </Button>
         </form>
       </CardContent>

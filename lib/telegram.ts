@@ -11,10 +11,14 @@ export interface TGUploadResult {
   fileId: string; messageId: string; fileSize: number; fileName: string
 }
 
-export async function telegramUpload(file: Buffer, fileName: string, caption?: string): Promise<TGUploadResult> {
+export async function telegramUpload(file: File | Blob | Buffer, fileName: string, caption?: string): Promise<TGUploadResult> {
   const form = new FormData()
   form.append('chat_id', CHANNEL_ID)
-  form.append('document', new Blob([new Uint8Array(file)], { type: 'application/pdf' }), fileName)
+  if (file instanceof Blob) {
+    form.append('document', file, fileName)
+  } else {
+    form.append('document', new Blob([new Uint8Array(file)], { type: 'application/pdf' }), fileName)
+  }
   if (caption) form.append('caption', caption.slice(0, 1024))
 
   const res = await fetch(`${API}/sendDocument`, { method: 'POST', body: form })

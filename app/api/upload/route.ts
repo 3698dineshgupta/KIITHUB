@@ -31,7 +31,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const form = await req.formData()
+    const contentTypeHeader = req.headers.get('content-type') || ''
+    if (!contentTypeHeader.includes('multipart/form-data')) {
+      return NextResponse.json({ error: 'Invalid content type' }, { status: 400 })
+    }
+
+    let form: FormData
+    try {
+      form = await req.formData()
+    } catch (error) {
+      return NextResponse.json(
+        { error: 'Invalid upload payload' },
+        { status: 400 }
+      )
+    }
     const file = form.get('file') as File | null
     const metaRaw = form.get('meta') as string | null
 
@@ -42,7 +55,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Only PDF files allowed' }, { status: 400 })
     }
     if (file.size > MAX_SIZE) {
-      return NextResponse.json({ error: 'File too large (max 50 MB)' }, { status: 400 })
+      return NextResponse.json({ error: 'File exceeds 50MB limit' }, { status: 400 })
     }
 
     const meta = metaSchema.parse(JSON.parse(metaRaw))
@@ -91,8 +104,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Upload to Telegram
-    const buffer = Buffer.from(await file.arrayBuffer())
-    const tgResult = await telegramUpload(buffer, file.name, meta.title)
+    const tgResult = await telegramUpload(file, file.name, meta.title)
 
     // Create DB record
     const baseSlug = slugify(meta.title)

@@ -58,7 +58,7 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
       </div>
 
       {/* Filter Row */}
-      <div className="flex flex-wrap gap-3 items-center">
+      <div className="flex overflow-x-auto pb-2 gap-3 items-center w-full scrollbar-hide md:flex-wrap">
         <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
 
         <Select value={sp.get('branch') ?? ''} onValueChange={v => updateParam('branch', v === 'all' ? null : v)}>

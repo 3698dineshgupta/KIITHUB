@@ -18,7 +18,7 @@ export default async function PYQViewPage({ params }: { params: Promise<{ slug: 
   const session = await auth()
   const pyq = await prisma.pYQ.findUnique({ where: { slug }, include: { subject: true, branch: true, semester: true } })
   if (!pyq || !pyq.isPublished) notFound()
-  const user = session?.user ? await prisma.user.findUnique({ where: { email: session.user.email! } }) : null
+  const user = session?.user?.email ? await prisma.user.findUnique({ where: { email: session.user.email } }) : null
   const userIsPremium = user ? isPremiumActive(user.membershipStatus, user.membershipExpiry) : false
   if (pyq.isPremium && !userIsPremium) {
     return <div className="max-w-5xl mx-auto px-4 py-8 space-y-6"><NoteMetaCard note={{ ...pyq, contentType: 'PYQ', tags: [] }} /><PremiumGate /></div>
