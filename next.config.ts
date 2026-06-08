@@ -38,10 +38,6 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-
-  experimental: {
-    middlewareClientMaxBodySize: '50mb'
-  }
 };
 
 export default nextConfig;

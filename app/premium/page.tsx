@@ -132,13 +132,8 @@ export default function PremiumPage() {
       form.append('screenshot', screenshot)
       if (notes) form.append('notes', notes)
       const res = await fetch('/api/payment', { method: 'POST', body: form })
-      let data;
-      try {
-        data = await res.json()
-      } catch (err) {
-        throw new Error(res.status === 413 ? 'The uploaded screenshot is too large. Please upload a smaller file.' : 'Upload failed. Please try again.')
-      }
-      if (!res.ok) throw new Error(data?.error || 'Submission failed')
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Submission failed')
       await update()
       setSubmitted(true)
     } catch (err: any) {

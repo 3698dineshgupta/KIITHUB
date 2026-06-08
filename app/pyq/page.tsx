@@ -4,22 +4,15 @@ import { prisma } from '@/lib/prisma'
 import { NotesFilters } from '@/components/notes/notes-filters'
 import { PYQList } from '@/components/notes/pyq-list'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cache } from '@/lib/redis'
 export const metadata: Metadata = { title: 'Previous Year Questions', description: 'Browse all PYQs organized by year, semester and subject.' }
 export const dynamic = "force-dynamic";
 export default async function PYQPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const resolvedSearchParams = await searchParams
-  let filterData = await cache.get<any>('filters:metadata')
-  if (!filterData) {
-    const [branches, semesters, subjects] = await Promise.all([
-      prisma.branch.findMany({ orderBy: { name: 'asc' } }),
-      prisma.semester.findMany({ orderBy: { number: 'asc' } }),
-      prisma.subject.findMany({ orderBy: { name: 'asc' }, include: { branch: true, semester: true } }),
-    ])
-    filterData = { branches, semesters, subjects }
-    await cache.set('filters:metadata', filterData, 3600)
-  }
-  const { branches, semesters, subjects } = filterData
+  const [branches, semesters, subjects] = await Promise.all([
+    prisma.branch.findMany({ orderBy: { name: 'asc' } }),
+    prisma.semester.findMany({ orderBy: { number: 'asc' } }),
+    prisma.subject.findMany({ orderBy: { name: 'asc' }, include: { branch: true, semester: true } }),
+  ])
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
