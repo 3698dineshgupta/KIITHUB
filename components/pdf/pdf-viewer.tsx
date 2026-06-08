@@ -76,7 +76,7 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail }
     setError(null)
   }
 
-  const onDocumentLoadError = (err: Error) => {
+  const onDocumentLoadError = (err: unknown) => {
     console.error('PDF JS load error:', err)
     setLoading(false)
     setError('Failed to load document. The secure token may have expired. Please refresh the page.')

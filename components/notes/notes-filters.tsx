@@ -43,6 +43,11 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
   const filteredSubjects = branchId
     ? subjects.filter(s => s.branchId === branchId)
     : subjects
+  
+  // Deduplicate subjects by name (same subject can exist under multiple branches)
+  const uniqueSubjects = filteredSubjects.filter(
+    (s, i, arr) => arr.findIndex(x => x.name === s.name) === i
+  )
 
   return (
     <div className="space-y-4 mb-6">
@@ -87,7 +92,7 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Subjects</SelectItem>
-            {filteredSubjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+            {uniqueSubjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
           </SelectContent>
         </Select>
 
