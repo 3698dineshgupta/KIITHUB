@@ -88,6 +88,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return token
     },
     async session({ session, token }) {
+      // If token has been invalidated (e.g. second login evicted it), return empty session
+      if (!token?.id) {
+        return { ...session, user: undefined as any }
+      }
       if (token && session.user) {
         session.user.id = token.id as string
         ;(session.user as any).role = token.role
