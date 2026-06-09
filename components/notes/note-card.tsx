@@ -37,7 +37,7 @@ export function NoteCard({ note, showBookmark = false }: NoteCardProps) {
   }
 
   return (
-    <Link href={`/notes/${note.slug}`}>
+    <Link href={note.contentType === 'PYQ' ? `/pyq/${note.slug}` : `/notes/${note.slug}`}>
       <Card className={cn('h-full hover:shadow-lg hover:-translate-y-1 transition-all duration-200 cursor-pointer group overflow-hidden', note.isPremium && 'border-amber-300 dark:border-amber-700')}>
         {note.isPremium && (
           <div className="h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
