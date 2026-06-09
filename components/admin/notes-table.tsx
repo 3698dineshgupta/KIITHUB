@@ -92,6 +92,15 @@ export function AdminNotesTable({ notes, total, page }: { notes: any[]; total: n
                 size="sm"
                 variant="outline"
                 className="h-8 text-xs"
+                onClick={() => router.push(`/admin/notes/${note.id}`)}
+              >
+                Edit
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs"
                 disabled={!!loading}
                 onClick={() => togglePremium(note.id, note.isPremium)}
               >

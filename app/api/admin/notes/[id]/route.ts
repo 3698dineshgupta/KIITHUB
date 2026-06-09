@@ -19,16 +19,41 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await requireAdmin(session.user.email)
 
     const body = await req.json()
-    const allowed = ['isPremium', 'isPublished', 'title', 'description']
+    const allowed = ['isPremium', 'isPublished', 'title', 'description', 'academicBranch', 'academicSemester', 'classYear', 'subjectName', 'contentType', 'examType', 'tags']
     const data: any = {}
     for (const key of allowed) {
-      if (key in body) data[key] = body[key]
+      if (key in body && key !== 'tags' && key !== 'subjectName') data[key] = body[key]
     }
 
-    let item: any
-    try {
+    // Resolve Subject/Branch/Semester if provided
+    if (body.subjectName && body.academicBranch && body.academicSemester) {
+      let dbBranch = await prisma.branch.findUnique({ where: { shortName: body.academicBranch } })
+      if (!dbBranch) dbBranch = await prisma.branch.create({ data: { name: body.academicBranch, shortName: body.academicBranch } })
+
+      const semNum = parseInt(body.academicSemester)
+      let dbSemester = await prisma.semester.findUnique({ where: { number: semNum } })
+      if (!dbSemester) dbSemester = await prisma.semester.create({ data: { number: semNum, label: `Semester ${semNum}` } })
+
+      let dbSubject = await prisma.subject.findFirst({ where: { name: body.subjectName, branchId: dbBranch.id, semesterId: dbSemester.id } })
+      if (!dbSubject) dbSubject = await prisma.subject.create({ data: { name: body.subjectName, branchId: dbBranch.id, semesterId: dbSemester.id } })
+
+      data.subjectId = dbSubject.id
+      data.branchId = dbBranch.id
+      data.semesterId = dbSemester.id
+    }
+
+    let item: any = await prisma.note.findUnique({ where: { id } })
+    const isNote = !!item
+
+    if (isNote) {
+      if (body.tags && Array.isArray(body.tags)) {
+        await prisma.noteTag.deleteMany({ where: { noteId: id } })
+        if (body.tags.length > 0) {
+          data.tags = { create: body.tags.map((t: string) => ({ tag: t.toLowerCase().trim() })) }
+        }
+      }
       item = await prisma.note.update({ where: { id }, data })
-    } catch {
+    } else {
       item = await prisma.pYQ.update({ where: { id }, data })
     }
     
@@ -38,6 +63,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ success: true, note: item })
   } catch (err: any) {
     if (err.message === 'Forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    console.error('PATCH note error:', err)
     return NextResponse.json({ error: 'Update failed' }, { status: 500 })
   }
 }
