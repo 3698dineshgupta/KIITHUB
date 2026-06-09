@@ -8,12 +8,18 @@ const benefits = ['All notes & PYQs unlocked','Lab manuals & assignments','Secur
 
 export async function PremiumGate() {
   let price = '299'
+  let days = '365'
   try {
-    const setting = await prisma.setting.findUnique({ where: { key: 'premium_price' } })
-    if (setting) price = setting.value
+    const settings = await prisma.setting.findMany({ where: { key: { in: ['premium_price', 'premium_days'] } } })
+    const p = settings.find(s => s.key === 'premium_price')
+    const d = settings.find(s => s.key === 'premium_days')
+    if (p) price = p.value
+    if (d) days = d.value
   } catch (err) {
-    console.error('Failed to fetch premium_price:', err)
+    console.error('Failed to fetch premium settings:', err)
   }
+
+  const duration = days === '365' ? 'year' : days === '30' ? 'month' : `${days} days`
 
   return (
     <Card className="p-8 text-center border-amber-300 dark:border-amber-700 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30">
@@ -28,7 +34,7 @@ export async function PremiumGate() {
         ))}
       </div>
       <Link href="/premium">
-        <Button variant="premium" size="lg" className="gap-2"><Crown className="h-5 w-5" />Upgrade to Premium — ₹{price}/year</Button>
+        <Button variant="premium" size="lg" className="gap-2"><Crown className="h-5 w-5" />Upgrade to Premium — ₹{price}/{duration}</Button>
       </Link>
     </Card>
   )

@@ -37,10 +37,10 @@ export default function PremiumPage() {
   
   // Dynamic Settings states
   const [bankQrCode, setBankQrCode] = useState<string | null>(null)
-  const [premiumPrice, setPremiumPrice] = useState('299')
+  const [premiumPrice, setPremiumPrice] = useState<string | null>(null)
   const [currencySymbol, setCurrencySymbol] = useState('₹')
   const [currencyCode, setCurrencyCode] = useState('INR')
-  const [premiumDays, setPremiumDays] = useState('365')
+  const [premiumDays, setPremiumDays] = useState<string | null>(null)
   const [upiId, setUpiId] = useState('pay@kiithub')
   const [paymentInstructions, setPaymentInstructions] = useState('Scan the QR code and pay the amount. Enter transaction ID and upload screenshot.')
   const [premiumFeatures, setPremiumFeatures] = useState<string[]>([])
@@ -236,9 +236,19 @@ export default function PremiumPage() {
                 <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
                   <div>
                     <div className="text-4xl font-extrabold text-amber-600 dark:text-amber-500 tabular-nums">
-                      {currencySymbol}{premiumPrice}
+                      {premiumPrice === null ? (
+                        <span className="animate-pulse bg-amber-200 dark:bg-amber-900/50 h-10 w-24 rounded-md inline-block"></span>
+                      ) : (
+                        `${currencySymbol}${premiumPrice}`
+                      )}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1">for {premiumDays} days validity</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {premiumDays === null ? (
+                        <span className="animate-pulse bg-muted h-4 w-32 rounded-md inline-block mt-1"></span>
+                      ) : (
+                        `for ${premiumDays} days validity`
+                      )}
+                    </div>
                   </div>
                   <Badge variant="premium" className="px-3 py-1 text-xs font-semibold bg-amber-500 text-white">
                     <Sparkles className="h-3 w-3 mr-1" /> Premium Plan
