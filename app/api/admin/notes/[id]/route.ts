@@ -45,16 +45,31 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     let item: any = await prisma.note.findUnique({ where: { id } })
     const isNote = !!item
 
+    // Build model-specific data (PYQ has no contentType; Note has no examType)
+    const noteAllowed = ['isPremium', 'isPublished', 'title', 'description', 'academicBranch', 'academicSemester', 'classYear', 'contentType']
+    const pyqAllowed  = ['isPremium', 'isPublished', 'title', 'description', 'academicBranch', 'academicSemester', 'classYear', 'examType']
+
+    const specificData: any = {}
+    const allowedKeys = isNote ? noteAllowed : pyqAllowed
+    for (const key of allowedKeys) {
+      if (key in body) specificData[key] = body[key]
+    }
+
+    // Merge relation IDs resolved above
+    if (data.subjectId) specificData.subjectId = data.subjectId
+    if (data.branchId)  specificData.branchId  = data.branchId
+    if (data.semesterId) specificData.semesterId = data.semesterId
+
     if (isNote) {
       if (body.tags && Array.isArray(body.tags)) {
         await prisma.noteTag.deleteMany({ where: { noteId: id } })
         if (body.tags.length > 0) {
-          data.tags = { create: body.tags.map((t: string) => ({ tag: t.toLowerCase().trim() })) }
+          specificData.tags = { create: body.tags.map((t: string) => ({ tag: t.toLowerCase().trim() })) }
         }
       }
-      item = await prisma.note.update({ where: { id }, data })
+      item = await prisma.note.update({ where: { id }, data: specificData })
     } else {
-      item = await prisma.pYQ.update({ where: { id }, data })
+      item = await prisma.pYQ.update({ where: { id }, data: specificData })
     }
     
     await cache.del(CACHE_KEYS.noteDetail(id))
