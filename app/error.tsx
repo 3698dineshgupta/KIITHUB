@@ -31,9 +31,11 @@ export default function Error({
           )}
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" asChild className="gap-2">
-            <Link href="/"><Home className="h-4 w-4" /> Go Home</Link>
-          </Button>
+          <Link href="/">
+            <Button variant="outline" className="gap-2">
+              <Home className="h-4 w-4" /> Go Home
+            </Button>
+          </Link>
           <Button onClick={() => reset()} className="gap-2">
             <RefreshCw className="h-4 w-4" /> Try Again
           </Button>

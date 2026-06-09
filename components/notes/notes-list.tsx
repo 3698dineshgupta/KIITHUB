@@ -17,37 +17,63 @@ export async function NotesList({ searchParams }: { searchParams: Record<string,
   const subjectId = searchParams.subject
   const sortBy = searchParams.sort ?? 'latest'
 
-  const where: any = { isPublished: true }
+  const whereNote: any = { isPublished: true }
+  const wherePyq: any = { isPublished: true }
+
   if (search) {
-    where.OR = [
+    whereNote.OR = [
       { title: { contains: search, mode: 'insensitive' } },
       { description: { contains: search, mode: 'insensitive' } },
       { subject: { name: { contains: search, mode: 'insensitive' } } },
       { tags: { some: { tag: { contains: search, mode: 'insensitive' } } } },
     ]
+    wherePyq.OR = [
+      { title: { contains: search, mode: 'insensitive' } },
+      { description: { contains: search, mode: 'insensitive' } },
+      { subject: { name: { contains: search, mode: 'insensitive' } } },
+    ]
   }
-  if (branchId) where.branchId = branchId
-  if (semesterId) where.semesterId = semesterId
-  if (contentType) where.contentType = contentType
-  if (subjectId) where.subjectId = subjectId
+  if (branchId) {
+    whereNote.branchId = branchId
+    wherePyq.branchId = branchId
+  }
+  if (semesterId) {
+    whereNote.semesterId = semesterId
+    wherePyq.semesterId = semesterId
+  }
+  if (subjectId) {
+    whereNote.subjectId = subjectId
+    wherePyq.subjectId = subjectId
+  }
+  if (contentType && contentType !== 'PYQ') {
+    whereNote.contentType = contentType
+  }
 
-  const orderBy: any =
-    sortBy === 'popular' ? { viewCount: 'desc' } :
-    { createdAt: 'desc' }
+  const fetchNotes = !contentType || contentType !== 'PYQ'
+  const fetchPyqs = !contentType || contentType === 'PYQ'
 
-  let notes: any[] = []
+  let combined: any[] = []
   let total = 0
 
   try {
-    const results = await Promise.all([
-      prisma.note.findMany({
-        where, orderBy, skip: (page - 1) * LIMIT, take: LIMIT,
-        include: { subject: true, branch: true, semester: true, tags: true },
-      }),
-      prisma.note.count({ where }),
+    const [notes, pyqs] = await Promise.all([
+      fetchNotes ? prisma.note.findMany({ where: whereNote, include: { subject: true, branch: true, semester: true, tags: true } }) : Promise.resolve([]),
+      fetchPyqs ? prisma.pYQ.findMany({ where: wherePyq, include: { subject: true, branch: true, semester: true } }) : Promise.resolve([])
     ])
-    notes = results[0]
-    total = results[1]
+    
+    combined = [
+      ...notes,
+      ...pyqs.map(p => ({ ...p, contentType: 'PYQ' }))
+    ]
+
+    // Sort in memory
+    if (sortBy === 'popular') {
+      combined.sort((a, b) => b.viewCount - a.viewCount)
+    } else {
+      combined.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    }
+
+    total = combined.length
   } catch (err) {
     console.error('Failed to fetch notes:', err)
     return (
@@ -58,12 +84,15 @@ export async function NotesList({ searchParams }: { searchParams: Record<string,
     )
   }
 
+  // Apply pagination
+  const paginatedNotes = combined.slice((page - 1) * LIMIT, page * LIMIT)
+
   // Attach bookmark status for signed-in users
   let bookmarkedIds = new Set<string>()
   if (session?.user?.id) {
     try {
       const bks = await prisma.bookmark.findMany({
-        where: { userId: session.user.id, noteId: { in: notes.map(n => n.id) } },
+        where: { userId: session.user.id, noteId: { in: paginatedNotes.map(n => n.id) } },
         select: { noteId: true },
       })
       bookmarkedIds = new Set(bks.map(b => b.noteId!))
@@ -74,10 +103,10 @@ export async function NotesList({ searchParams }: { searchParams: Record<string,
 
   const totalPages = Math.ceil(total / LIMIT)
 
-  if (!notes.length) {
+  if (!combined.length) {
     return (
       <div className="text-center py-16 text-muted-foreground">
-        <p className="text-lg font-medium mb-2">No notes found</p>
+        <p className="text-lg font-medium mb-2">No documents found</p>
         <p className="text-sm">Try adjusting your filters or search query.</p>
       </div>
     )
@@ -88,7 +117,7 @@ export async function NotesList({ searchParams }: { searchParams: Record<string,
       <p className="text-sm text-muted-foreground mb-4">{total} result{total !== 1 ? 's' : ''}</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {notes.map(note => (
+        {paginatedNotes.map(note => (
           <NoteCard
             key={note.id}
             note={{ ...note, isBookmarked: bookmarkedIds.has(note.id) }}
