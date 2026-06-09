@@ -1,7 +1,7 @@
 'use client'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { useCallback } from 'react'
-import { Search, X, SlidersHorizontal } from 'lucide-react'
+import { useCallback, useTransition } from 'react'
+import { Search, X, SlidersHorizontal, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -24,6 +24,7 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const sp = useSearchParams()
+  const [isPending, startTransition] = useTransition()
 
   const updateParam = useCallback(
     (key: string, value: string | null) => {
@@ -31,12 +32,18 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
       if (value) params.set(key, value)
       else params.delete(key)
       params.delete('page')
-      router.push(`${pathname}?${params.toString()}`)
+      startTransition(() => {
+        router.push(`${pathname}?${params.toString()}`)
+      })
     },
     [router, pathname, sp]
   )
 
-  const clearAll = () => router.push(pathname)
+  const clearAll = () => {
+    startTransition(() => {
+      router.push(pathname)
+    })
+  }
   const hasFilters = sp.size > 0
 
   const branchId = sp.get('branch') ?? ''
@@ -50,7 +57,7 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
   )
 
   return (
-    <div className="space-y-4 mb-6">
+    <div className="space-y-4 mb-6 relative">
       {/* Search */}
       <div className="relative max-w-xl">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -58,15 +65,21 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
           placeholder="Search by title, subject, keywords..."
           defaultValue={sp.get('search') ?? ''}
           onChange={e => updateParam('search', e.target.value || null)}
-          className="pl-9"
+          className="pl-9 pr-10"
+          disabled={isPending}
         />
+        {isPending && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
+          </div>
+        )}
       </div>
 
       {/* Filter Row */}
       <div className="flex flex-wrap gap-3 items-center">
         <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
 
-        <Select value={sp.get('branch') ?? ''} onValueChange={v => updateParam('branch', v === 'all' ? null : v)}>
+        <Select value={sp.get('branch') ?? ''} onValueChange={v => updateParam('branch', v === 'all' ? null : v)} disabled={isPending}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Branch" />
           </SelectTrigger>
@@ -76,7 +89,7 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
           </SelectContent>
         </Select>
 
-        <Select value={sp.get('semester') ?? ''} onValueChange={v => updateParam('semester', v === 'all' ? null : v)}>
+        <Select value={sp.get('semester') ?? ''} onValueChange={v => updateParam('semester', v === 'all' ? null : v)} disabled={isPending}>
           <SelectTrigger className="w-36">
             <SelectValue placeholder="Semester" />
           </SelectTrigger>
@@ -86,7 +99,7 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
           </SelectContent>
         </Select>
 
-        <Select value={sp.get('subject') ?? ''} onValueChange={v => updateParam('subject', v === 'all' ? null : v)}>
+        <Select value={sp.get('subject') ?? ''} onValueChange={v => updateParam('subject', v === 'all' ? null : v)} disabled={isPending}>
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Subject" />
           </SelectTrigger>
@@ -97,7 +110,7 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
         </Select>
 
         {pathname.includes('/pyq') ? (
-          <Select value={sp.get('examType') ?? ''} onValueChange={v => updateParam('examType', v === 'all' ? null : v)}>
+          <Select value={sp.get('examType') ?? ''} onValueChange={v => updateParam('examType', v === 'all' ? null : v)} disabled={isPending}>
             <SelectTrigger className="w-40">
               <SelectValue placeholder="Exam Type" />
             </SelectTrigger>
@@ -108,7 +121,7 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
             </SelectContent>
           </Select>
         ) : (
-          <Select value={sp.get('type') ?? ''} onValueChange={v => updateParam('type', v === 'all' ? null : v)}>
+          <Select value={sp.get('type') ?? ''} onValueChange={v => updateParam('type', v === 'all' ? null : v)} disabled={isPending}>
             <SelectTrigger className="w-40">
               <SelectValue placeholder="Content Type" />
             </SelectTrigger>
@@ -119,7 +132,7 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
           </Select>
         )}
 
-        <Select value={sp.get('sort') ?? 'latest'} onValueChange={v => updateParam('sort', v)}>
+        <Select value={sp.get('sort') ?? 'latest'} onValueChange={v => updateParam('sort', v)} disabled={isPending}>
           <SelectTrigger className="w-36">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
@@ -130,7 +143,7 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
         </Select>
 
         {hasFilters && (
-          <Button variant="ghost" size="sm" onClick={clearAll} className="gap-1 text-muted-foreground">
+          <Button variant="ghost" size="sm" onClick={clearAll} className="gap-1 text-muted-foreground" disabled={isPending}>
             <X className="h-4 w-4" />Clear
           </Button>
         )}
