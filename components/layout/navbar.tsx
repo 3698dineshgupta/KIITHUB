@@ -47,7 +47,7 @@ export function Navbar() {
           </nav>
           <div className="flex items-center gap-2">
             {mounted && <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="p-2 rounded-lg hover:bg-accent transition-colors">{theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>}
-            {status === 'loading' ? <div className="h-8 w-20 bg-muted animate-pulse rounded-lg" /> : session ? (
+            {status === 'loading' ? <div className="h-8 w-20 bg-muted animate-pulse rounded-lg" /> : session?.user ? (
               <div className="relative">
                 <button onClick={() => setUserMenu(!userMenu)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent transition-colors">
                   <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">{user?.name?.[0]?.toUpperCase() ?? 'U'}</div>
@@ -83,7 +83,7 @@ export function Navbar() {
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="md:hidden border-t bg-background overflow-hidden">
             <div className="px-4 py-3 space-y-1">
               {navLinks.map(link => (<Link key={link.href} href={link.href} className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium', pathname.startsWith(link.href) ? 'bg-primary/10 text-primary' : 'hover:bg-accent')}><link.icon className="h-4 w-4" />{link.label}</Link>))}
-              {!session && <div className="pt-3 border-t flex flex-col gap-2"><Link href="/login"><Button variant="outline" className="w-full">Login</Button></Link><Link href="/register"><Button className="w-full">Sign Up</Button></Link></div>}
+              {!session?.user && <div className="pt-3 border-t flex flex-col gap-2"><Link href="/login"><Button variant="outline" className="w-full">Login</Button></Link><Link href="/register"><Button className="w-full">Sign Up</Button></Link></div>}
             </div>
           </motion.div>
         )}
