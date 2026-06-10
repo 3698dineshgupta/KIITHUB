@@ -45,7 +45,7 @@ export default function PrivacyPolicy() {
 
       <section>
         <h2 className="text-2xl font-bold mb-4">5. Contact Us</h2>
-        <p>If you have any questions or concerns about this Privacy Policy, please contact us at support@kiithub.com.</p>
+        <p>If you have any questions or concerns about this Privacy Policy, please contact us at support.kiithub@gmail.com.</p>
       </section>
     </div>
   )

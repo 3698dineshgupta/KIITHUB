@@ -29,7 +29,7 @@ export function Footer() {
           <div className="flex items-center gap-4">
             <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground"><Github className="h-4 w-4" /></a>
             <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground"><Twitter className="h-4 w-4" /></a>
-            <a href="mailto:support@kiithub.com" className="text-muted-foreground hover:text-foreground"><Mail className="h-4 w-4" /></a>
+            <a href="mailto:support.kiithub@gmail.com" className="text-muted-foreground hover:text-foreground"><Mail className="h-4 w-4" /></a>
           </div>
         </div>
       </div>

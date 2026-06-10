@@ -49,14 +49,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Screenshot too large (max 15 MB)', code: 400 }, { status: 400 })
     }
 
-    // Ensure upload directory exists and save screenshot
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'payments')
-    await mkdir(uploadDir, { recursive: true })
-    const filename = `${Date.now()}-${screenshotFile.name.replace(/\s+/g, '_')}`
-    const filepath = path.join(uploadDir, filename)
-    const bytes = await screenshotFile.arrayBuffer()
-    await writeFile(filepath, Buffer.from(bytes))
-    const screenshotUrl = `/uploads/payments/${filename}`
+    // Vercel serverless functions are read-only, so we DO NOT save the screenshot locally.
+    // The admin will verify the screenshot via the Telegram channel.
+    const screenshotUrl = 'Sent to Telegram'
 
     // Fetch dynamic pricing and validity from admin settings
     const [priceSetting, daysSetting] = await Promise.all([
