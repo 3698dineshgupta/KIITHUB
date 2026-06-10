@@ -14,7 +14,7 @@ export async function NotesList({ searchParams }: { searchParams: Record<string,
   const branchId = searchParams.branch
   const semesterId = searchParams.semester
   const contentType = searchParams.type as ContentType | undefined
-  const subjectId = searchParams.subject
+  const subjectName = searchParams.subject
   const sortBy = searchParams.sort ?? 'latest'
 
   const whereNote: any = { isPublished: true }
@@ -41,9 +41,9 @@ export async function NotesList({ searchParams }: { searchParams: Record<string,
     whereNote.semesterId = semesterId
     wherePyq.semesterId = semesterId
   }
-  if (subjectId) {
-    whereNote.subjectId = subjectId
-    wherePyq.subjectId = subjectId
+  if (subjectName) {
+    whereNote.subject = { name: subjectName }
+    wherePyq.subject = { name: subjectName }
   }
   if (contentType && contentType !== 'PYQ') {
     whereNote.contentType = contentType
