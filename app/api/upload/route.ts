@@ -5,6 +5,17 @@ import { telegramUpload } from '@/lib/telegram'
 import { slugify } from '@/lib/utils'
 import { z } from 'zod'
 
+// Allow up to 50 MB for PDF uploads
+export const config = {
+  api: {
+    bodyParser: false,
+    sizeLimit: '52mb',
+  },
+}
+
+// Next.js App Router route segment config
+export const maxDuration = 60
+
 const MAX_SIZE = 50 * 1024 * 1024 // 50 MB
 
 const metaSchema = z.object({
