@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     try {
       const tgSuccess = await sendPaymentProofToTelegram({
         userName: user.name,
-        userEmail: session.user.email,
+        userEmail: user.email,
         transactionId,
         amount,
         membershipDays,
