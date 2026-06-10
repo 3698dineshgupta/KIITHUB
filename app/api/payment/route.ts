@@ -127,12 +127,16 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Forbidden', code: 403 }, { status: 403 })
     }
 
-    const { paymentId, action, membershipDays = 365 } = await req.json()
+    const body = await req.json()
+    const { paymentId, action } = body
 
     const payment = await prisma.paymentRequest.findUnique({
       where: { id: paymentId }, include: { user: true },
     })
     if (!payment) return NextResponse.json({ success: false, error: 'Payment not found', code: 404 }, { status: 404 })
+
+    // Use admin-provided days, or fall back to the days stored when the user submitted payment
+    const membershipDays = Number(body.membershipDays ?? payment.membershipDays ?? 90)
 
     if (action === 'approve') {
       const expiry = new Date()
