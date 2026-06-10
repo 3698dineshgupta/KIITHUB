@@ -14,6 +14,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
+    "upload:local": "node scripts/local-upload-server.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -65,6 +66,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.5.0",
+    "busboy": "^1.6.0",
     "eslint": "^8.57.0",
     "eslint-config-next": "15.0.0",
     "postcss": "^8.5.15",

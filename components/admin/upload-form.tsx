@@ -42,6 +42,12 @@ export function AdminUploadForm({ branches, semesters, subjects }: Props) {
   const [isPremium, setIsPremium] = useState(false)
   const [tags, setTags] = useState('')
 
+  // 4 MB — Vercel's hard API route limit
+  const VERCEL_LIMIT = 4 * 1024 * 1024
+  const LOCAL_SERVER = 'http://localhost:3001'
+
+  const isLargeFile = file ? file.size > VERCEL_LIMIT : false
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!file || !title || !subjectName || !academicBranch || !academicSemester || !classYear) {
@@ -62,7 +68,9 @@ export function AdminUploadForm({ branches, semesters, subjects }: Props) {
         tags: tags.split(',').map(t => t.trim()).filter(Boolean),
       }))
 
-      const res = await fetch('/api/upload', { method: 'POST', body: form })
+      // Route large files to local server to bypass Vercel 4 MB limit
+      const endpoint = isLargeFile ? `${LOCAL_SERVER}/api/upload` : '/api/upload'
+      const res = await fetch(endpoint, { method: 'POST', body: form })
       const data = await res.json()
 
       if (!res.ok) throw new Error(data.error || 'Upload failed')
@@ -71,7 +79,11 @@ export function AdminUploadForm({ branches, semesters, subjects }: Props) {
       setTitle(''); setDescription(''); setSubjectName(''); setAcademicBranch(''); setAcademicSemester(''); setClassYear(''); setTags(''); setFile(null)
       setTimeout(() => router.push('/admin/notes'), 2000)
     } catch (err: any) {
-      setErrorMsg(err.message)
+      if (err.message?.includes('Failed to fetch') && isLargeFile) {
+        setErrorMsg('Large file upload failed: Make sure the local upload server is running. Run: node scripts/local-upload-server.mjs')
+      } else {
+        setErrorMsg(err.message)
+      }
       setStatus('error')
     } finally {
       setUploading(false)
@@ -97,6 +109,17 @@ export function AdminUploadForm({ branches, semesters, subjects }: Props) {
           </div>
         )}
 
+        {/* Large file warning */}
+        {isLargeFile && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 mb-4 text-sm">
+            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <span>
+              File is <strong>&gt; 4 MB</strong> — will upload via local server (<code className="font-mono text-xs bg-amber-100 dark:bg-amber-900/40 px-1 py-0.5 rounded">localhost:3001</code>).{' '}
+              Make sure to run: <code className="font-mono text-xs bg-amber-100 dark:bg-amber-900/40 px-1 py-0.5 rounded">node scripts/local-upload-server.mjs</code>
+            </span>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* File Drop Zone */}
           <div>
@@ -117,12 +140,23 @@ export function AdminUploadForm({ branches, semesters, subjects }: Props) {
                 <div className="flex flex-col items-center gap-2 text-primary">
                   <File className="h-8 w-8" />
                   <span className="text-sm font-medium">{file.name}</span>
-                  <span className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                    <span className={cn(
+                      'text-xs font-medium px-2 py-0.5 rounded-full',
+                      isLargeFile
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                        : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                    )}>
+                      {isLargeFile ? '⚡ Local server' : '☁️ Vercel'}
+                    </span>
+                  </div>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2 text-muted-foreground">
                   <Upload className="h-8 w-8" />
                   <span className="text-sm">Click to select PDF (max 50 MB)</span>
+                  <span className="text-xs">≤ 4 MB → Vercel · &gt; 4 MB → Local server</span>
                 </div>
               )}
             </label>
