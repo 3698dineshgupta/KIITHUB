@@ -5,13 +5,23 @@ import { sendPaymentProofToTelegram } from '@/lib/telegram'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
 
+// Allow up to 20 MB for high-res payment screenshots
+export const config = {
+  api: {
+    bodyParser: false,
+    sizeLimit: '20mb',
+  },
+}
+
+export const maxDuration = 60
+
 // Student submits payment screenshot
 export async function POST(req: NextRequest) {
   try {
     const session = await auth()
-    if (!session?.user?.email) return NextResponse.json({ success: false, error: 'Unauthorized', code: 401 }, { status: 401 })
+    if (!session?.user?.id) return NextResponse.json({ success: false, error: 'Unauthorized', code: 401 }, { status: 401 })
 
-    const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } })
     if (!user) return NextResponse.json({ success: false, error: 'User not found', code: 404 }, { status: 404 })
 
     // Check for existing pending request
