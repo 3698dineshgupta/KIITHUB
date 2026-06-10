@@ -34,10 +34,8 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-2 font-bold text-xl">
-            <div className="w-8 h-8 rounded-full bg-black dark:bg-white flex items-center justify-center">
-              <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-white dark:text-black mb-[1px]">
-                <path d="M12 2L2 22h20L12 2z" />
-              </svg>
+            <div className="w-9 h-9 rounded-[0.55rem] bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-sm">
+              K
             </div>
             <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">KIIT Hub</span>
           </Link>
