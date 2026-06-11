@@ -102,11 +102,25 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const target = note || pyq
     const resourceType = note ? 'note' : 'pyq'
 
-    // Delete from Telegram channel
+    // Delete from Storage
     try {
-      await telegramDelete(target!.telegramMsgId)
+      if (target!.telegramMsgId === 'supabase') {
+        const { supabaseDelete } = await import('@/lib/supabase')
+        const { cache, CACHE_KEYS } = await import('@/lib/redis')
+        const settingsKey = CACHE_KEYS.settings()
+        let settingsMap = await cache.get<Record<string, string>>(settingsKey)
+        if (!settingsMap) {
+          const dbSettings = await prisma.setting.findMany()
+          settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]))
+          await cache.set(settingsKey, settingsMap, 3600)
+        }
+        const supabaseBucket = settingsMap.supabase_bucket || 'documents'
+        await supabaseDelete(target!.telegramFileId, supabaseBucket)
+      } else {
+        await telegramDelete(target!.telegramMsgId)
+      }
     } catch (e) {
-      console.warn('Telegram delete failed (file may already be gone):', e)
+      console.warn('Storage delete failed (file may already be gone):', e)
     }
 
     // Delete from DB

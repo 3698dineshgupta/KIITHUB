@@ -8,16 +8,23 @@ export default async function AdminUploadPage() {
   let semesters: any[] = []
   let subjects: any[] = []
   let dbError = false
+  let defaultStorageProvider = 'telegram'
+  let defaultSupabaseBucket = 'documents'
 
   try {
-    const [b, s, sub] = await Promise.all([
+    const [b, s, sub, settings] = await Promise.all([
       prisma.branch.findMany({ orderBy: { name: 'asc' } }),
       prisma.semester.findMany({ orderBy: { number: 'asc' } }),
       prisma.subject.findMany({ orderBy: { name: 'asc' }, include: { branch: true, semester: true } }),
+      prisma.setting.findMany().catch(() => []),
     ])
     branches = b
     semesters = s
     subjects = sub
+
+    const settingsMap = Object.fromEntries(settings.map(st => [st.key, st.value]))
+    defaultStorageProvider = settingsMap.storage_provider || 'telegram'
+    defaultSupabaseBucket = settingsMap.supabase_bucket || 'documents'
   } catch (err) {
     console.error('[AdminUploadPage] DB error:', err)
     dbError = true
@@ -27,7 +34,7 @@ export default async function AdminUploadPage() {
     <div className="max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Upload PDF</h1>
-        <p className="text-muted-foreground">Upload study materials to Telegram storage</p>
+        <p className="text-muted-foreground">Upload study materials to Telegram or Supabase storage</p>
       </div>
 
       {dbError && (
@@ -45,7 +52,13 @@ export default async function AdminUploadPage() {
         </div>
       )}
 
-      <AdminUploadForm branches={branches} semesters={semesters} subjects={subjects} />
+      <AdminUploadForm
+        branches={branches}
+        semesters={semesters}
+        subjects={subjects}
+        defaultStorageProvider={defaultStorageProvider}
+        defaultSupabaseBucket={defaultSupabaseBucket}
+      />
     </div>
   )
 }

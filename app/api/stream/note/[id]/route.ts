@@ -33,30 +33,43 @@ export async function GET(
       return NextResponse.json({ error: 'Premium required' }, { status: 403 })
     }
 
-    // Check Redis cache for Telegram file URL
-    const cacheKey = CACHE_KEYS.telegramUrl(note.telegramFileId)
     let pdfBuffer: Buffer
 
-    const cachedUrl = await cache.get<string>(cacheKey)
-    if (cachedUrl) {
-      try {
-        const res = await fetch(cachedUrl)
-        if (res.ok) {
-          pdfBuffer = Buffer.from(await res.arrayBuffer())
-        } else {
-          // URL expired — fetch fresh and cache it
-          const freshUrl = await telegramGetFileUrl(note.telegramFileId)
-          await cache.set(cacheKey, freshUrl, 3300)
+    if (note.telegramMsgId === 'supabase') {
+      const { supabaseStream } = await import('@/lib/supabase')
+      const settingsKey = CACHE_KEYS.settings()
+      let settingsMap = await cache.get<Record<string, string>>(settingsKey)
+      if (!settingsMap) {
+        const dbSettings = await prisma.setting.findMany()
+        settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]))
+        await cache.set(settingsKey, settingsMap, 3600)
+      }
+      const supabaseBucket = settingsMap.supabase_bucket || 'documents'
+      pdfBuffer = await supabaseStream(note.telegramFileId, supabaseBucket)
+    } else {
+      // Check Redis cache for Telegram file URL
+      const cacheKey = CACHE_KEYS.telegramUrl(note.telegramFileId)
+      const cachedUrl = await cache.get<string>(cacheKey)
+      if (cachedUrl) {
+        try {
+          const res = await fetch(cachedUrl)
+          if (res.ok) {
+            pdfBuffer = Buffer.from(await res.arrayBuffer())
+          } else {
+            // URL expired — fetch fresh and cache it
+            const freshUrl = await telegramGetFileUrl(note.telegramFileId)
+            await cache.set(cacheKey, freshUrl, 3300)
+            pdfBuffer = await telegramStream(note.telegramFileId)
+          }
+        } catch (e) {
+          console.warn('Cached Telegram URL fetch error, falling back to direct stream:', e)
           pdfBuffer = await telegramStream(note.telegramFileId)
         }
-      } catch (e) {
-        console.warn('Cached Telegram URL fetch error, falling back to direct stream:', e)
+      } else {
+        const freshUrl = await telegramGetFileUrl(note.telegramFileId)
+        await cache.set(cacheKey, freshUrl, 3300)
         pdfBuffer = await telegramStream(note.telegramFileId)
       }
-    } else {
-      const freshUrl = await telegramGetFileUrl(note.telegramFileId)
-      await cache.set(cacheKey, freshUrl, 3300)
-      pdfBuffer = await telegramStream(note.telegramFileId)
     }
 
     return new NextResponse(new Uint8Array(pdfBuffer), {

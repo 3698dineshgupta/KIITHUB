@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CheckCircle, Loader2 } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface Props { settings: Record<string, string> }
 
@@ -156,6 +157,39 @@ export function AdminSettingsForm({ settings }: Props) {
                 </div>
               </div>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Group 2.5: Storage Settings */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base text-amber-600 font-semibold">Storage Settings</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label className="mb-1.5 block">Storage Provider</Label>
+            <Select
+              value={values.storage_provider ?? 'telegram'}
+              onValueChange={val => set('storage_provider', val)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select storage provider" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="telegram">Telegram Channel</SelectItem>
+                <SelectItem value="supabase">Supabase Storage</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="mb-1.5 block">Supabase Storage Bucket</Label>
+            <Input
+              value={values.supabase_bucket ?? 'documents'}
+              onChange={e => set('supabase_bucket', e.target.value)}
+              placeholder="documents"
+              disabled={values.storage_provider !== 'supabase'}
+            />
           </div>
         </CardContent>
       </Card>

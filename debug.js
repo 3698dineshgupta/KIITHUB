@@ -1,0 +1,1 @@
+const fs = require('fs'); const env = fs.readFileSync('.env.local', 'utf8'); for (const line of env.split('\n')) { const trimmed = line.trim(); if (trimmed.startsWith('SUPABASE_SERVICE_ROLE_KEY')) { const val = trimmed.slice(trimmed.indexOf('=') + 1).trim().replace(/^["']|["']$/g, ''); console.log('Parsed:', val, 'Length:', val.length); } }

@@ -15,6 +15,7 @@ import { fileURLToPath } from 'url'
 import { readFileSync } from 'fs'
 import Busboy from 'busboy'
 import { PrismaClient } from '@prisma/client'
+import { createClient } from '@supabase/supabase-js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -65,6 +66,44 @@ async function telegramUpload(buffer, fileName, caption) {
     messageId: String(d.result.message_id),
     fileSize: doc.file_size ?? 0,
     fileName: doc.file_name ?? fileName
+  }
+}
+
+let _supabase = null
+function getSupabaseClient() {
+  if (!_supabase) {
+    const url = process.env.SUPABASE_URL || 'https://qbgmidxjhqznldfpvory.supabase.co'
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+    console.log('[DEBUG] SUPABASE_SERVICE_ROLE_KEY is:', key ? (key.substring(0, 10) + '...' + key.length + ' chars') : 'empty');
+    _supabase = createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    })
+  }
+  return _supabase
+}
+
+async function supabaseUpload(buffer, fileName, bucketName = 'documents') {
+  const fileExtension = fileName.split('.').pop() || 'pdf'
+  const baseName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName
+  const cleanBase = baseName.replace(/[^a-zA-Z0-9-_]/g, '_')
+  const timestamp = Date.now()
+  const uniqueName = `${cleanBase}_${timestamp}.${fileExtension}`
+  
+  const client = getSupabaseClient()
+  const { data, error } = await client.storage
+    .from(bucketName)
+    .upload(uniqueName, buffer, {
+      contentType: 'application/pdf',
+      upsert: true
+    })
+  
+  if (error) {
+    console.error('Supabase upload error detail:', error)
+    throw new Error(`Supabase upload failed: ${error.message}`)
+  }
+  return {
+    path: data.path,
+    fileSize: buffer.length
   }
 }
 
@@ -141,10 +180,32 @@ async function handleUpload(req, res) {
           dbSubject = await prisma.subject.create({ data: { name: meta.subjectName, branchId: dbBranch.id, semesterId: dbSemester.id } })
         }
 
-        // Upload to Telegram
-        console.log('[Upload] Uploading to Telegram...')
-        const tgResult = await telegramUpload(fileBuffer, fileName, meta.title)
-        console.log('[Upload] Telegram upload success, fileId:', tgResult.fileId)
+        // Retrieve settings from the DB for storage provider defaults
+        const dbSettings = await prisma.setting.findMany().catch(() => [])
+        const settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]))
+        
+        const storageProvider = meta.storageProvider || settingsMap.storage_provider || 'telegram'
+        const supabaseBucket = settingsMap.supabase_bucket || 'documents'
+
+        let fileId = ''
+        let msgId = ''
+        let fileSize = 0
+
+        if (storageProvider === 'supabase') {
+          console.log('[Upload] Uploading to Supabase Storage...')
+          const supResult = await supabaseUpload(fileBuffer, fileName, supabaseBucket)
+          console.log('[Upload] Supabase upload success, path:', supResult.path)
+          fileId = supResult.path
+          msgId = 'supabase'
+          fileSize = supResult.fileSize
+        } else {
+          console.log('[Upload] Uploading to Telegram...')
+          const tgResult = await telegramUpload(fileBuffer, fileName, meta.title)
+          console.log('[Upload] Telegram upload success, fileId:', tgResult.fileId)
+          fileId = tgResult.fileId
+          msgId = tgResult.messageId
+          fileSize = tgResult.fileSize
+        }
 
         // Create DB record
         const baseSlug = slugify(meta.title)
@@ -165,8 +226,8 @@ async function handleUpload(req, res) {
               subjectId: dbSubject.id, branchId: dbBranch.id, semesterId: dbSemester.id,
               academicBranch: meta.academicBranch, academicSemester: meta.academicSemester,
               classYear: meta.classYear, isPremium: meta.isPremium,
-              telegramFileId: tgResult.fileId, telegramMsgId: tgResult.messageId,
-              fileSize: tgResult.fileSize,
+              telegramFileId: fileId, telegramMsgId: msgId,
+              fileSize: fileSize,
             }
           })
           res.writeHead(200, { 'Content-Type': 'application/json' })
@@ -186,8 +247,8 @@ async function handleUpload(req, res) {
             subjectId: dbSubject.id, branchId: dbBranch.id, semesterId: dbSemester.id,
             academicBranch: meta.academicBranch, academicSemester: meta.academicSemester,
             classYear: meta.classYear, isPremium: meta.isPremium,
-            telegramFileId: tgResult.fileId, telegramMsgId: tgResult.messageId,
-            fileSize: tgResult.fileSize,
+            telegramFileId: fileId, telegramMsgId: msgId,
+            fileSize: fileSize,
             ...(meta.tags?.length ? { tags: { create: meta.tags.map(t => ({ tag: t.toLowerCase().trim() })) } } : {}),
           }
         })

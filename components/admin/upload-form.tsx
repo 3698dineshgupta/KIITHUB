@@ -21,9 +21,17 @@ interface Props {
   branches: { id: string; name: string; shortName: string }[]
   semesters: { id: string; number: number; label: string }[]
   subjects: { id: string; name: string; branchId: string; semesterId: string; branch: { shortName: string }; semester: { number: number } }[]
+  defaultStorageProvider?: string
+  defaultSupabaseBucket?: string
 }
 
-export function AdminUploadForm({ branches, semesters, subjects }: Props) {
+export function AdminUploadForm({
+  branches,
+  semesters,
+  subjects,
+  defaultStorageProvider = 'telegram',
+  defaultSupabaseBucket = 'documents',
+}: Props) {
   const router = useRouter()
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -41,6 +49,7 @@ export function AdminUploadForm({ branches, semesters, subjects }: Props) {
   const [examType, setExamType] = useState('End Semester')
   const [isPremium, setIsPremium] = useState(false)
   const [tags, setTags] = useState('')
+  const [storageProvider, setStorageProvider] = useState(defaultStorageProvider)
 
   // 4 MB — Vercel's hard API route limit
   const VERCEL_LIMIT = 4 * 1024 * 1024
@@ -66,6 +75,7 @@ export function AdminUploadForm({ branches, semesters, subjects }: Props) {
         title, description, subjectName, academicBranch, academicSemester, classYear,
         contentType, examType: contentType === 'PYQ' ? examType : undefined, isPremium,
         tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+        storageProvider,
       }))
 
       // Route large files to local server to bypass Vercel 4 MB limit
@@ -99,7 +109,7 @@ export function AdminUploadForm({ branches, semesters, subjects }: Props) {
         {status === 'success' && (
           <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 mb-6">
             <CheckCircle className="h-5 w-5 flex-shrink-0" />
-            <span className="text-sm">PDF uploaded to Telegram successfully! Redirecting...</span>
+            <span className="text-sm">PDF uploaded to {storageProvider === 'supabase' ? 'Supabase' : 'Telegram'} successfully! Redirecting...</span>
           </div>
         )}
         {status === 'error' && (
@@ -160,6 +170,28 @@ export function AdminUploadForm({ branches, semesters, subjects }: Props) {
                 </div>
               )}
             </label>
+          </div>
+
+          {/* Storage Selection */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="mb-2 block">Upload Destination</Label>
+              <Select value={storageProvider} onValueChange={setStorageProvider}>
+                <SelectTrigger><SelectValue placeholder="Select upload destination" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="telegram">Telegram Bot Storage</SelectItem>
+                  <SelectItem value="supabase">Supabase Storage</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="mb-2 block">Storage Info</Label>
+              <div className="flex items-center h-10 px-3 border rounded-lg text-sm bg-muted/30 text-muted-foreground">
+                {storageProvider === 'supabase'
+                  ? `Supabase Bucket: ${defaultSupabaseBucket}`
+                  : 'Telegram Private Channel'}
+              </div>
+            </div>
           </div>
 
           {/* Title */}
@@ -258,7 +290,17 @@ export function AdminUploadForm({ branches, semesters, subjects }: Props) {
           </div>
 
           <Button type="submit" disabled={uploading} className="w-full gap-2" size="lg">
-            {uploading ? <><Loader2 className="h-5 w-5 animate-spin" />Uploading to Telegram...</> : <><Upload className="h-5 w-5" />Upload PDF</>}
+            {uploading ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Uploading to {storageProvider === 'supabase' ? 'Supabase' : 'Telegram'}...
+              </>
+            ) : (
+              <>
+                <Upload className="h-5 w-5" />
+                Upload PDF
+              </>
+            )}
           </Button>
         </form>
       </CardContent>

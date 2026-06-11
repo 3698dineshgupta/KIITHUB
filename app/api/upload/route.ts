@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { telegramUpload } from '@/lib/telegram'
+import { supabaseUpload } from '@/lib/supabase'
+import { cache, CACHE_KEYS } from '@/lib/redis'
 import { slugify } from '@/lib/utils'
 import { z } from 'zod'
 
@@ -30,6 +32,7 @@ const metaSchema = z.object({
   year: z.number().int().min(2000).max(2030).optional(),
   examType: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  storageProvider: z.enum(['telegram', 'supabase']).optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -101,9 +104,34 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Upload to Telegram
+    // Upload logic based on selected storage provider
+    const settingsKey = CACHE_KEYS.settings()
+    let settingsMap = await cache.get<Record<string, string>>(settingsKey)
+    if (!settingsMap) {
+      const dbSettings = await prisma.setting.findMany()
+      settingsMap = Object.fromEntries(dbSettings.map(s => [s.key, s.value]))
+      await cache.set(settingsKey, settingsMap, 3600)
+    }
+
+    const storageProvider = meta.storageProvider || settingsMap.storage_provider || 'telegram'
+    const supabaseBucket = settingsMap.supabase_bucket || 'documents'
+
     const buffer = Buffer.from(await file.arrayBuffer())
-    const tgResult = await telegramUpload(buffer, file.name, meta.title)
+    let fileId = ''
+    let msgId = ''
+    let fileSize = 0
+
+    if (storageProvider === 'supabase') {
+      const supResult = await supabaseUpload(buffer, file.name, supabaseBucket)
+      fileId = supResult.path
+      msgId = 'supabase'
+      fileSize = supResult.fileSize
+    } else {
+      const tgResult = await telegramUpload(buffer, file.name, meta.title)
+      fileId = tgResult.fileId
+      msgId = tgResult.messageId
+      fileSize = tgResult.fileSize
+    }
 
     // Create DB record
     const baseSlug = slugify(meta.title)
@@ -129,16 +157,15 @@ export async function POST(req: NextRequest) {
           academicSemester: meta.academicSemester,
           classYear: meta.classYear,
           isPremium: meta.isPremium,
-          telegramFileId: tgResult.fileId,
-          telegramMsgId: tgResult.messageId,
-          fileSize: tgResult.fileSize,
+          telegramFileId: fileId,
+          telegramMsgId: msgId,
+          fileSize: fileSize,
           uploadedById: user.id,
         },
       })
       await prisma.auditLog.create({
         data: { userId: user.id, action: 'UPLOAD', resource: 'pyq', resourceId: pyq.id },
       })
-      const { cache } = await import('@/lib/redis')
       await cache.del('home:data')
       return NextResponse.json({ success: true, pyq })
     }
@@ -161,9 +188,9 @@ export async function POST(req: NextRequest) {
         academicSemester: meta.academicSemester,
         classYear: meta.classYear,
         isPremium: meta.isPremium,
-        telegramFileId: tgResult.fileId,
-        telegramMsgId: tgResult.messageId,
-        fileSize: tgResult.fileSize,
+        telegramFileId: fileId,
+        telegramMsgId: msgId,
+        fileSize: fileSize,
         uploadedById: user.id,
         ...(meta.tags?.length ? { tags: { create: meta.tags.map(t => ({ tag: t.toLowerCase().trim() })) } } : {}),
       },
@@ -174,7 +201,6 @@ export async function POST(req: NextRequest) {
       data: { userId: user.id, action: 'UPLOAD', resource: 'note', resourceId: note.id },
     })
 
-    const { cache } = await import('@/lib/redis')
     await cache.del('home:data')
 
     return NextResponse.json({ success: true, note })
