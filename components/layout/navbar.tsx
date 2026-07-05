@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { useTheme } from 'next-themes'
 import { motion, AnimatePresence } from 'framer-motion'
-import { BookOpen, FileText, Calculator, Crown, Menu, X, Sun, Moon, LogOut, User, LayoutDashboard, ChevronDown, Shield } from 'lucide-react'
+import { BookOpen, FileText, Calculator, Crown, Menu, X, Sun, Moon, LogOut, User, LayoutDashboard, ChevronDown, Shield, ShoppingBag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn, isPremiumActive } from '@/lib/utils'
@@ -14,6 +14,7 @@ const navLinks = [
   { href: '/notes', label: 'Notes', icon: BookOpen },
   { href: '/pyq', label: 'PYQs', icon: FileText },
   { href: '/calculator', label: 'Calculator', icon: Calculator },
+  { href: '/merchandise', label: 'Merchandise', icon: ShoppingBag },
   { href: '/premium', label: 'Premium', icon: Crown, highlight: true },
 ]
 
@@ -62,7 +63,7 @@ export function Navbar() {
                     <div className="fixed inset-0 z-10" onClick={() => setUserMenu(false)} />
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: 0.15 }} className="absolute right-0 mt-2 w-52 bg-background border rounded-xl shadow-xl z-20 overflow-hidden py-1">
                       <div className="px-3 py-2 border-b"><p className="text-sm font-medium truncate">{user?.name}</p><p className="text-xs text-muted-foreground truncate">{user?.email}</p></div>
-                      {[{href:'/dashboard',label:'Dashboard',icon:LayoutDashboard},{href:'/profile',label:'Profile',icon:User},...(user?.role==='ADMIN'?[{href:'/admin',label:'Admin Panel',icon:Shield}]:[])].map(item=>(
+                      {[{href:'/dashboard',label:'Dashboard',icon:LayoutDashboard},{href:'/profile',label:'Profile',icon:User},{href:'/merchandise/my-listings',label:'My Listings',icon:ShoppingBag},...(user?.role==='ADMIN'?[{href:'/admin',label:'Admin Panel',icon:Shield}]:[])].map(item=>(
                         <Link key={item.href} href={item.href} className="flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent transition-colors" onClick={() => setUserMenu(false)}><item.icon className="h-4 w-4 text-muted-foreground" />{item.label}</Link>
                       ))}
                       <button onClick={() => { signOut({ callbackUrl: '/' }); setUserMenu(false) }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"><LogOut className="h-4 w-4" />Sign out</button>

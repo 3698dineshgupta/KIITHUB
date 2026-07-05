@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, FileText, Upload, Users, CreditCard,
-  Settings, BookOpen, ChevronRight, Shield,
+  Settings, BookOpen, ChevronRight, Shield, ShoppingBag,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -13,6 +13,7 @@ const items = [
   { href: '/admin/upload', label: 'Upload PDF', icon: Upload },
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/payments', label: 'Payments', icon: CreditCard },
+  { href: '/admin/merchandise', label: 'Merchandise', icon: ShoppingBag },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ]
 

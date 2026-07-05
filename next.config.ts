@@ -4,7 +4,8 @@ const nextConfig: NextConfig = {
   images: {
     domains: [
       'lh3.googleusercontent.com',
-      'avatars.githubusercontent.com'
+      'avatars.githubusercontent.com',
+      'qbgmidxjhqznldfpvory.supabase.co'
     ],
     formats: ['image/avif', 'image/webp']
   },
