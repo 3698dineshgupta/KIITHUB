@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { supabaseUploadImage, supabaseDelete } from '@/lib/supabase'
+import { cloudinaryUploadImage, cloudinaryDeleteImage } from '@/lib/cloudinary'
 import { sendListingForApproval } from '@/lib/telegram-merch'
 import { z } from 'zod'
 
@@ -16,7 +16,6 @@ export const maxDuration = 60
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024
 const MAX_IMAGES = 6
-const MERCH_BUCKET = process.env.SUPABASE_BUCKET_MERCH || 'merch-images'
 
 const CATEGORIES = ['ELECTRONICS', 'BOOKS_NOTES', 'COOKING_APPLIANCES', 'CYCLES', 'FURNITURE', 'CLOTHING', 'SPORTS_FITNESS', 'STATIONERY', 'OTHER'] as const
 const CONDITIONS = ['NEW', 'LIKE_NEW', 'GOOD', 'FAIR'] as const
@@ -87,12 +86,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       const uploaded = await Promise.all(newImageFiles.map(async f => {
         const buffer = Buffer.from(await f.arrayBuffer())
-        return supabaseUploadImage(buffer, f.name, f.type, MERCH_BUCKET)
+        return cloudinaryUploadImage(buffer, f.name)
       }))
-      await Promise.all(listing.images.map(img => supabaseDelete(img.path, MERCH_BUCKET)))
+      await Promise.all(listing.images.map(img => cloudinaryDeleteImage(img.path)))
       await prisma.merchImage.deleteMany({ where: { listingId: id } })
       await Promise.all(uploaded.map((u, i) =>
-        prisma.merchImage.create({ data: { listingId: id, url: u.publicUrl, path: u.path, order: i } })
+        prisma.merchImage.create({ data: { listingId: id, url: u.url, path: u.publicId, order: i } })
       ))
     }
 
@@ -162,7 +161,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       return NextResponse.json({ success: false, error: 'Forbidden', code: 403 }, { status: 403 })
     }
 
-    await Promise.all(listing.images.map(img => supabaseDelete(img.path, MERCH_BUCKET)))
+    await Promise.all(listing.images.map(img => cloudinaryDeleteImage(img.path)))
     await prisma.merchListing.delete({ where: { id } })
 
     return NextResponse.json({ success: true })

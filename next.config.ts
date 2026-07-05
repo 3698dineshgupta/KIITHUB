@@ -5,7 +5,8 @@ const nextConfig: NextConfig = {
     domains: [
       'lh3.googleusercontent.com',
       'avatars.githubusercontent.com',
-      'qbgmidxjhqznldfpvory.supabase.co'
+      'qbgmidxjhqznldfpvory.supabase.co',
+      'res.cloudinary.com'
     ],
     formats: ['image/avif', 'image/webp']
   },

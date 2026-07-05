@@ -46,43 +46,6 @@ export async function supabaseUpload(
   }
 }
 
-export async function supabaseUploadImage(
-  file: Buffer,
-  fileName: string,
-  contentType: string,
-  bucketName: string = 'merch-images'
-): Promise<{ path: string; publicUrl: string; fileSize: number }> {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error('Supabase environment variables (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) are not set.')
-  }
-
-  const fileExtension = fileName.split('.').pop() || 'jpg'
-  const baseName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName
-  const cleanBase = baseName.replace(/[^a-zA-Z0-9-_]/g, '_')
-  const timestamp = Date.now()
-  const uniqueName = `${cleanBase}_${timestamp}_${Math.random().toString(36).slice(2, 8)}.${fileExtension}`
-
-  const { data, error } = await supabase.storage
-    .from(bucketName)
-    .upload(uniqueName, file, {
-      contentType,
-      upsert: true,
-    })
-
-  if (error) {
-    console.error('Supabase image upload error detail:', error)
-    throw new Error(`Supabase image upload failed: ${error.message}`)
-  }
-
-  const { data: publicUrlData } = supabase.storage.from(bucketName).getPublicUrl(data.path)
-
-  return {
-    path: data.path,
-    publicUrl: publicUrlData.publicUrl,
-    fileSize: file.length,
-  }
-}
-
 export async function supabaseStream(
   path: string,
   bucketName: string = 'documents'

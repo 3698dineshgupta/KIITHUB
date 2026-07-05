@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import type { Prisma } from '@prisma/client'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { supabaseUploadImage } from '@/lib/supabase'
+import { cloudinaryUploadImage } from '@/lib/cloudinary'
 import { sendListingForApproval } from '@/lib/telegram-merch'
 import { slugify } from '@/lib/utils'
 import { z } from 'zod'
@@ -18,7 +18,6 @@ export const maxDuration = 60
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5 MB per image
 const MAX_IMAGES = 6
-const MERCH_BUCKET = process.env.SUPABASE_BUCKET_MERCH || 'merch-images'
 
 const CATEGORIES = ['ELECTRONICS', 'BOOKS_NOTES', 'COOKING_APPLIANCES', 'CYCLES', 'FURNITURE', 'CLOTHING', 'SPORTS_FITNESS', 'STATIONERY', 'OTHER'] as const
 const CONDITIONS = ['NEW', 'LIKE_NEW', 'GOOD', 'FAIR'] as const
@@ -136,7 +135,7 @@ export async function POST(req: NextRequest) {
 
     const uploaded = await Promise.all(imageFiles.map(async f => {
       const buffer = Buffer.from(await f.arrayBuffer())
-      return supabaseUploadImage(buffer, f.name, f.type, MERCH_BUCKET)
+      return cloudinaryUploadImage(buffer, f.name)
     }))
 
     const listing = await prisma.merchListing.create({
@@ -151,7 +150,7 @@ export async function POST(req: NextRequest) {
         location: meta.location,
         whatsapp: meta.whatsapp,
         sellerId: user.id,
-        images: { create: uploaded.map((u, i) => ({ url: u.publicUrl, path: u.path, order: i })) },
+        images: { create: uploaded.map((u, i) => ({ url: u.url, path: u.publicId, order: i })) },
       },
       include: { images: true },
     })
