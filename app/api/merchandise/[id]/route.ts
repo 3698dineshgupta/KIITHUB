@@ -56,7 +56,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 
-// PATCH — owner edits & resubmits a REJECTED listing
+// PATCH — owner edits their listing (any status). Editing always sends the
+// listing back through moderation, since content may have changed.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
@@ -66,7 +67,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const listing = await prisma.merchListing.findUnique({ where: { id }, include: { images: true } })
     if (!listing) return NextResponse.json({ success: false, error: 'Listing not found', code: 404 }, { status: 404 })
     if (listing.sellerId !== session.user.id) return NextResponse.json({ success: false, error: 'Forbidden', code: 403 }, { status: 403 })
-    if (listing.status !== 'REJECTED') return NextResponse.json({ success: false, error: 'Only rejected listings can be edited', code: 400 }, { status: 400 })
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } })
     if (!user) return NextResponse.json({ success: false, error: 'User not found', code: 404 }, { status: 404 })
@@ -116,7 +116,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       include: { images: { orderBy: { order: 'asc' } } },
     })
 
-    await prisma.merchModerationLog.create({ data: { listingId: id, action: 'RESUBMITTED' } })
+    await prisma.merchModerationLog.create({ data: { listingId: id, action: listing.status === 'REJECTED' ? 'RESUBMITTED' : 'EDITED' } })
 
     let telegramSent = false
     let telegramError: string | null = null

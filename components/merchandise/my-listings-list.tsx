@@ -64,11 +64,12 @@ export function MyListingsList({ listings }: { listings: MerchListingSummary[] }
             </div>
 
             <div className="flex gap-2">
-              {listing.status === 'REJECTED' && (
-                <Link href={`/merchandise/my-listings/${listing.id}/edit`}>
-                  <Button size="sm" variant="outline" className="gap-1.5"><Pencil className="h-3.5 w-3.5" />Edit & Resubmit</Button>
-                </Link>
-              )}
+              <Link href={`/merchandise/my-listings/${listing.id}/edit`}>
+                <Button size="sm" variant="outline" className="gap-1.5">
+                  <Pencil className="h-3.5 w-3.5" />
+                  {listing.status === 'REJECTED' ? 'Edit & Resubmit' : 'Edit'}
+                </Button>
+              </Link>
               <Button size="sm" variant="outline" className="gap-1.5 text-destructive hover:bg-destructive/10" disabled={deleting === listing.id} onClick={() => handleDelete(listing.id)}>
                 {deleting === listing.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
               </Button>

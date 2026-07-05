@@ -104,7 +104,7 @@ export function SellForm({ mode = 'create', listingId, initialData }: Props) {
   if (success) {
     return (
       <Card className="p-8 text-center">
-        <p className="font-medium mb-1">{mode === 'edit' ? 'Listing resubmitted!' : 'Listing submitted!'}</p>
+        <p className="font-medium mb-1">{mode === 'edit' ? 'Listing updated!' : 'Listing submitted!'}</p>
         <p className="text-sm text-muted-foreground">It&apos;s pending admin review. Redirecting to your listings…</p>
       </Card>
     )
@@ -216,7 +216,7 @@ export function SellForm({ mode = 'create', listingId, initialData }: Props) {
 
         <Button type="submit" className="w-full" disabled={loading}>
           {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-          {mode === 'edit' ? 'Resubmit for Approval' : 'Submit for Approval'}
+          {mode === 'edit' ? 'Save Changes' : 'Submit for Approval'}
         </Button>
       </form>
     </Card>

@@ -18,14 +18,15 @@ export default async function EditListingPage({ params }: { params: Promise<{ id
   })
 
   if (!listing || listing.sellerId !== session.user.id) notFound()
-  if (listing.status !== 'REJECTED') redirect('/merchandise/my-listings')
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-1">Edit & Resubmit Listing</h1>
-        {listing.rejectionReason && (
+        <h1 className="text-2xl font-bold mb-1">Edit Listing</h1>
+        {listing.status === 'REJECTED' && listing.rejectionReason ? (
           <p className="text-sm text-destructive">Previously rejected: {listing.rejectionReason}</p>
+        ) : (
+          <p className="text-muted-foreground text-sm">Saving changes will send this listing back for admin review before it&apos;s visible again.</p>
         )}
       </div>
       <SellForm
