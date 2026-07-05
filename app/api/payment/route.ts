@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { sendPaymentProofToTelegram } from '@/lib/telegram'
+import { sendPremiumApprovedEmail } from '@/lib/mail'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
 
@@ -160,6 +161,7 @@ export async function PATCH(req: NextRequest) {
           },
         }),
       ])
+      await sendPremiumApprovedEmail(payment.user.email, payment.user.name, membershipDays)
     } else if (action === 'reject') {
       await prisma.$transaction([
         prisma.paymentRequest.update({

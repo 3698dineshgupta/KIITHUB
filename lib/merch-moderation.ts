@@ -1,6 +1,9 @@
 import { prisma } from '@/lib/prisma'
 import { editListingMessage, formatListingCaption } from '@/lib/telegram-merch'
 import { notifyListingApproved, notifyListingRejected } from '@/lib/merch-notify'
+import { sendListingApprovedEmail } from '@/lib/mail'
+
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
 export async function approveListing(listingId: string, adminId: string | null) {
   const listing = await prisma.merchListing.findUnique({ where: { id: listingId }, include: { seller: true } })
@@ -17,6 +20,7 @@ export async function approveListing(listingId: string, adminId: string | null) 
     }),
   ])
   await notifyListingApproved(listing.sellerId, listing.title)
+  await sendListingApprovedEmail(listing.seller.email, listing.seller.name, listing.title, `${SITE_URL}/merchandise/${listing.slug}`)
 
   if (listing.telegramMessageId) {
     const caption = formatListingCaption({ ...listing, seller: listing.seller }, '✅ APPROVED')
