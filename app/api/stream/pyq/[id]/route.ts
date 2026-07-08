@@ -43,7 +43,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       telegramMsgId: pyq.telegramMsgId,
       title: pyq.title,
       fileSize: pyq.fileSize,
-    })
+    }, req.headers.get('range'))
     if (devTiming) console.log(`[stream/pyq] response ready +${(performance.now() - t0).toFixed(0)}ms`)
     return response
   } catch (err) {

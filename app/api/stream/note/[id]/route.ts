@@ -46,7 +46,7 @@ export async function GET(
       telegramMsgId: note.telegramMsgId,
       title: note.title,
       fileSize: note.fileSize,
-    })
+    }, req.headers.get('range'))
     if (devTiming) console.log(`[stream/note] response ready +${(performance.now() - t0).toFixed(0)}ms`)
     return response
   } catch (err) {

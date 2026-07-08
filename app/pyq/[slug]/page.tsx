@@ -4,10 +4,11 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { signStreamToken } from '@/lib/jwt'
 import { isPremiumActive } from '@/lib/utils'
-import { PDFViewer } from '@/components/pdf/pdf-viewer'
 import { PremiumGate } from '@/components/pdf/premium-gate'
 import { CloseDocumentLoader } from '@/components/pdf/close-document-loader'
 import { NoteMetaCard } from '@/components/notes/note-meta-card'
+import { DocumentViewerShell } from '@/components/pdf/document-viewer-shell'
+import { getSuggestions } from '@/lib/recommendations'
 import { JsonLd, SITE_URL, breadcrumbJsonLd } from '@/components/seo/json-ld'
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -76,15 +77,46 @@ export default async function PYQViewPage({ params }: { params: Promise<{ slug: 
     streamToken = signedToken
     if (devTiming) console.log(`[pyq/${slug}] token+view recorded +${(performance.now() - t0).toFixed(0)}ms`)
   }
+
+  const suggestions = streamToken
+    ? await getSuggestions({
+        type: 'pyq',
+        id: pyq.id,
+        subjectId: pyq.subjectId,
+        semesterId: pyq.semesterId,
+        branchId: pyq.branchId,
+        examType: pyq.examType,
+      })
+    : []
+
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-5xl mx-auto px-4 py-8">
       <JsonLd data={breadcrumb} />
       <JsonLd data={creativeWork} />
-      <NoteMetaCard note={{ ...pyq, contentType: 'PYQ', tags: [] }} />
-      {streamToken
-        ? <PDFViewer streamUrl={`/api/stream/pyq/${pyq.id}?token=${streamToken}`} title={pyq.title} isPremium={pyq.isPremium} userEmail={user?.email ?? ''} />
-        : <div className="rounded-xl border p-8 text-center"><CloseDocumentLoader /><p className="font-medium mb-3">Sign in to view this PYQ</p><Link href="/login" className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium">Sign in</Link></div>
-      }
+      {streamToken ? (
+        <DocumentViewerShell
+          initial={{
+            type: 'pyq',
+            slug: pyq.slug,
+            title: pyq.title,
+            isPremium: pyq.isPremium,
+            totalPages: null,
+            streamUrl: `/api/stream/pyq/${pyq.id}?token=${streamToken}`,
+            userEmail: user?.email ?? '',
+            meta: { ...pyq, contentType: 'PYQ', tags: [] },
+            suggestions,
+          }}
+        />
+      ) : (
+        <div className="space-y-6">
+          <NoteMetaCard note={{ ...pyq, contentType: 'PYQ', tags: [] }} />
+          <div className="rounded-xl border p-8 text-center">
+            <CloseDocumentLoader />
+            <p className="font-medium mb-3">Sign in to view this PYQ</p>
+            <Link href="/login" className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium">Sign in</Link>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

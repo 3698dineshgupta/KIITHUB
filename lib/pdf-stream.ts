@@ -20,9 +20,35 @@ function pdfHeaders(title: string, contentLength?: number) {
     'Content-Disposition': `inline; filename="${encodeURIComponent(title)}.pdf"`,
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'SAMEORIGIN',
+    // Lets pdf.js/react-pdf switch to ranged requests so it only fetches the
+    // xref table + the objects a given page needs, instead of waiting for
+    // the entire file to download before rendering anything.
+    'Accept-Ranges': 'bytes',
   }
   if (contentLength) headers['Content-Length'] = String(contentLength)
   return headers
+}
+
+function parseRange(rangeHeader: string, totalLength: number): { start: number; end: number } | null {
+  const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim())
+  if (!match || (!match[1] && !match[2])) return null
+  const start = match[1] ? parseInt(match[1], 10) : totalLength - parseInt(match[2], 10)
+  const end = match[2] && match[1] ? Math.min(parseInt(match[2], 10), totalLength - 1) : totalLength - 1
+  if (start < 0 || end < start) return null
+  return { start, end }
+}
+
+function sliceResponse(buf: Buffer, title: string, rangeHeader?: string | null): NextResponse {
+  if (rangeHeader) {
+    const range = parseRange(rangeHeader, buf.length)
+    if (range) {
+      const slice = buf.subarray(range.start, range.end + 1)
+      const headers = pdfHeaders(title, slice.length)
+      headers['Content-Range'] = `bytes ${range.start}-${range.end}/${buf.length}`
+      return new NextResponse(new Uint8Array(slice), { status: 206, headers })
+    }
+  }
+  return new NextResponse(new Uint8Array(buf), { headers: pdfHeaders(title, buf.length) })
 }
 
 async function getSupabaseBucket(): Promise<string> {
@@ -41,23 +67,27 @@ async function getSupabaseBucket(): Promise<string> {
 // stale cached URL silently serve a few-KB error page as if it were the real
 // (often much larger) PDF. Cross-check content-type and, when we know the
 // real file size from the DB, the size too.
-function isValidFileResponse(res: Response, expectedSize?: number | null): boolean {
+function isValidFileResponse(res: Response, expectedSize?: number | null, isRange?: boolean): boolean {
   if (!res.ok) return false
   const contentType = (res.headers.get('content-type') || '').toLowerCase()
   if (contentType.includes('text/html') || contentType.includes('application/json')) return false
-  if (expectedSize && expectedSize > 0) {
+  // A ranged request's content-length is the slice size, not the full file
+  // size, so the size cross-check only applies to whole-file requests.
+  if (!isRange && expectedSize && expectedSize > 0) {
     const len = Number(res.headers.get('content-length') || 0)
     if (len > 0 && Math.abs(len - expectedSize) > Math.max(2048, expectedSize * 0.01)) return false
   }
   return true
 }
 
-async function fetchUpstream(telegramFileId: string, telegramMsgId: string, expectedSize?: number | null): Promise<Response> {
+async function fetchUpstream(telegramFileId: string, telegramMsgId: string, expectedSize?: number | null, rangeHeader?: string | null): Promise<Response> {
+  const fetchInit = rangeHeader ? { headers: { Range: rangeHeader } } : undefined
+
   if (telegramMsgId === 'supabase') {
     const bucket = await getSupabaseBucket()
     const signedUrl = await supabaseCreateSignedUrl(telegramFileId, bucket, 60)
-    const res = await fetch(signedUrl)
-    if (!isValidFileResponse(res, expectedSize)) {
+    const res = await fetch(signedUrl, fetchInit)
+    if (!isValidFileResponse(res, expectedSize, !!rangeHeader)) {
       throw new Error(`Supabase file fetch returned unexpected content (status ${res.status}, type ${res.headers.get('content-type')})`)
     }
     return res
@@ -66,14 +96,14 @@ async function fetchUpstream(telegramFileId: string, telegramMsgId: string, expe
   const urlCacheKey = CACHE_KEYS.telegramUrl(telegramFileId)
   const cachedUrl = await cache.get<string>(urlCacheKey)
   if (cachedUrl) {
-    const res = await fetch(cachedUrl)
-    if (isValidFileResponse(res, expectedSize)) return res
+    const res = await fetch(cachedUrl, fetchInit)
+    if (isValidFileResponse(res, expectedSize, !!rangeHeader)) return res
     // Cached URL expired/invalid — fall through to refresh below
   }
   const freshUrl = await telegramGetFileUrl(telegramFileId)
   await cache.set(urlCacheKey, freshUrl, 3300)
-  const freshRes = await fetch(freshUrl)
-  if (!isValidFileResponse(freshRes, expectedSize)) {
+  const freshRes = await fetch(freshUrl, fetchInit)
+  if (!isValidFileResponse(freshRes, expectedSize, !!rangeHeader)) {
     throw new Error(`Telegram file fetch returned unexpected content (status ${freshRes.status}, type ${freshRes.headers.get('content-type')})`)
   }
   return freshRes
@@ -93,7 +123,7 @@ export interface StreamablePdf {
  * (Telegram/Supabase) response instead of buffering the whole file
  * server-side before the client sees a single byte.
  */
-export async function buildPdfResponse(doc: StreamablePdf): Promise<NextResponse> {
+export async function buildPdfResponse(doc: StreamablePdf, rangeHeader?: string | null): Promise<NextResponse> {
   const t0 = devTiming ? performance.now() : 0
   const mark = (label: string) => {
     if (devTiming) console.log(`[pdf-stream] ${label} +${(performance.now() - t0).toFixed(0)}ms`)
@@ -103,13 +133,11 @@ export async function buildPdfResponse(doc: StreamablePdf): Promise<NextResponse
   const cached = await cache.get<string>(byteCacheKey)
   if (cached) {
     mark('cache HIT, serving buffered bytes')
-    return new NextResponse(new Uint8Array(Buffer.from(cached, 'base64')), {
-      headers: pdfHeaders(doc.title),
-    })
+    return sliceResponse(Buffer.from(cached, 'base64'), doc.title, rangeHeader)
   }
   mark('cache miss, fetching upstream')
 
-  const upstreamRes = await fetchUpstream(doc.telegramFileId, doc.telegramMsgId, doc.fileSize)
+  const upstreamRes = await fetchUpstream(doc.telegramFileId, doc.telegramMsgId, doc.fileSize, rangeHeader)
   if (!upstreamRes.body) {
     throw new Error('Upstream document fetch returned no body')
   }
@@ -117,7 +145,21 @@ export async function buildPdfResponse(doc: StreamablePdf): Promise<NextResponse
 
   const contentLength = Number(upstreamRes.headers.get('content-length') || 0)
 
-  if (contentLength > 0 && contentLength < MAX_CACHE_BYTES) {
+  // A ranged request that the upstream actually honored (206) — pass the
+  // slice straight through without buffering the whole file server-side.
+  if (rangeHeader && upstreamRes.status === 206) {
+    mark('upstream honored range, passing slice through')
+    const headers = pdfHeaders(doc.title)
+    const contentRange = upstreamRes.headers.get('content-range')
+    if (contentRange) headers['Content-Range'] = contentRange
+    if (contentLength) headers['Content-Length'] = String(contentLength)
+    return new NextResponse(upstreamRes.body, { status: 206, headers })
+  }
+
+  // Only buffer+cache whole-file responses under the size cap — a range
+  // request the upstream didn't honor (fell back to 200) shouldn't get
+  // cached mid-slice as if it were the full, unranged file.
+  if (!rangeHeader && contentLength > 0 && contentLength < MAX_CACHE_BYTES) {
     const buf = Buffer.from(await upstreamRes.arrayBuffer())
     mark('buffered small file')
     cache.set(byteCacheKey, buf.toString('base64'), 21600).catch(() => {}) // 6h, best-effort

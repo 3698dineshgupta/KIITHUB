@@ -5,11 +5,12 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { signStreamToken } from '@/lib/jwt'
 import { isPremiumActive } from '@/lib/utils'
-import { PDFViewer } from '@/components/pdf/pdf-viewer'
 import { PremiumGate } from '@/components/pdf/premium-gate'
 import { CloseDocumentLoader } from '@/components/pdf/close-document-loader'
 import { NoteMetaCard } from '@/components/notes/note-meta-card'
+import { DocumentViewerShell } from '@/components/pdf/document-viewer-shell'
 import { cache, CACHE_KEYS } from '@/lib/redis'
+import { getSuggestions } from '@/lib/recommendations'
 import { JsonLd, SITE_URL, breadcrumbJsonLd } from '@/components/seo/json-ld'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -99,24 +100,44 @@ export default async function NoteViewPage({ params }: { params: Promise<{ slug:
     if (devTiming) console.log(`[notes/${slug}] token+view recorded +${(performance.now() - t0).toFixed(0)}ms`)
   }
 
+  const suggestions = streamToken
+    ? await getSuggestions({
+        type: 'note',
+        id: note.id,
+        subjectId: note.subjectId,
+        semesterId: note.semesterId,
+        branchId: note.branchId,
+        contentType: note.contentType,
+        tags: note.tags.map(t => t.tag),
+      })
+    : []
+
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-5xl mx-auto px-4 py-8">
       <JsonLd data={breadcrumb} />
       <JsonLd data={creativeWork} />
-      <NoteMetaCard note={note} />
       {streamToken ? (
-        <PDFViewer
-          streamUrl={`/api/stream/note/${note.id}?token=${streamToken}`}
-          title={note.title}
-          isPremium={note.isPremium}
-          totalPages={note.totalPages}
-          userEmail={user?.email ?? ''}
+        <DocumentViewerShell
+          initial={{
+            type: 'note',
+            slug: note.slug,
+            title: note.title,
+            isPremium: note.isPremium,
+            totalPages: note.totalPages,
+            streamUrl: `/api/stream/note/${note.id}?token=${streamToken}`,
+            userEmail: user?.email ?? '',
+            meta: note,
+            suggestions,
+          }}
         />
       ) : (
-        <div className="rounded-xl border p-8 text-center">
-          <CloseDocumentLoader />
-          <p className="font-medium mb-3">Sign in to view this PDF</p>
-          <Link href="/login" className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90">Sign in</Link>
+        <div className="space-y-6">
+          <NoteMetaCard note={note} />
+          <div className="rounded-xl border p-8 text-center">
+            <CloseDocumentLoader />
+            <p className="font-medium mb-3">Sign in to view this PDF</p>
+            <Link href="/login" className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90">Sign in</Link>
+          </div>
         </div>
       )}
     </div>

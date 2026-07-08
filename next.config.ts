@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // react-pdf/pdfjs's Document loading task isn't safe against React 18
+  // Strict Mode's dev-only double-invoke of effects (mount → cleanup →
+  // remount): the cleanup's destroy() races the in-flight getDocument()
+  // promise from the first mount, which then tries to message a worker
+  // transport that's already been nulled out — surfaces as "Cannot read
+  // properties of null (reading 'sendWithPromise')". Dev-only; doesn't
+  // affect production, where Strict Mode never double-invokes regardless.
+  reactStrictMode: false,
   images: {
     domains: [
       'lh3.googleusercontent.com',

@@ -39,4 +39,5 @@ export const CACHE_KEYS = {
   popularNotes: () => `popular:notes`,
   trendingNotes: () => `trending:notes`,
   settings: () => `app:settings`,
+  suggestions: (type: 'note' | 'pyq', id: string) => `suggest:${type}:${id}`,
 }
