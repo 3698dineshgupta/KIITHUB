@@ -55,25 +55,35 @@ export async function NotesList({ searchParams }: { searchParams: Record<string,
   let combined: any[] = []
   let total = 0
 
+  // Fetching only the top `page * LIMIT` rows from each table (sorted the
+  // same way as the final merge) is enough to guarantee a correct merged
+  // result for the current page — the true top-K of two same-sorted lists
+  // is always contained within the top-K of each individually. This avoids
+  // pulling every published note/PYQ into memory on every request.
+  const perTableTake = page * LIMIT
+  const orderBy = sortBy === 'popular' ? { viewCount: 'desc' as const } : { createdAt: 'desc' as const }
+
   try {
-    const [notes, pyqs] = await Promise.all([
-      fetchNotes ? prisma.note.findMany({ where: whereNote, include: { subject: true, branch: true, semester: true, tags: true } }) : Promise.resolve([]),
-      fetchPyqs ? prisma.pYQ.findMany({ where: wherePyq, include: { subject: true, branch: true, semester: true } }) : Promise.resolve([])
+    const [notes, pyqs, noteCount, pyqCount] = await Promise.all([
+      fetchNotes ? prisma.note.findMany({ where: whereNote, include: { subject: true, branch: true, semester: true }, orderBy, take: perTableTake }) : Promise.resolve([]),
+      fetchPyqs ? prisma.pYQ.findMany({ where: wherePyq, include: { subject: true, branch: true, semester: true }, orderBy, take: perTableTake }) : Promise.resolve([]),
+      fetchNotes ? prisma.note.count({ where: whereNote }) : Promise.resolve(0),
+      fetchPyqs ? prisma.pYQ.count({ where: wherePyq }) : Promise.resolve(0),
     ])
-    
+
     combined = [
       ...notes,
       ...pyqs.map(p => ({ ...p, contentType: 'PYQ' }))
     ]
 
-    // Sort in memory
+    // Sort the merged (already individually-sorted) top-K rows
     if (sortBy === 'popular') {
       combined.sort((a, b) => b.viewCount - a.viewCount)
     } else {
       combined.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     }
 
-    total = combined.length
+    total = noteCount + pyqCount
   } catch (err) {
     console.error('Failed to fetch notes:', err)
     return (

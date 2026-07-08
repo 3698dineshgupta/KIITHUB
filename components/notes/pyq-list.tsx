@@ -47,15 +47,12 @@ export async function PYQList({ searchParams }: { searchParams: Record<string, s
   ])
 
   let bookmarkedIds = new Set<string>()
-  if (session?.user) {
-    const user = await prisma.user.findUnique({ where: { email: session.user.email! } })
-    if (user) {
-      const bks = await prisma.bookmark.findMany({
-        where: { userId: user.id, pyqId: { in: pyqs.map(p => p.id) } },
-        select: { pyqId: true },
-      })
-      bookmarkedIds = new Set(bks.map(b => b.pyqId!))
-    }
+  if (session?.user?.id) {
+    const bks = await prisma.bookmark.findMany({
+      where: { userId: session.user.id, pyqId: { in: pyqs.map(p => p.id) } },
+      select: { pyqId: true },
+    })
+    bookmarkedIds = new Set(bks.map(b => b.pyqId!))
   }
 
   const totalPages = Math.ceil(total / LIMIT)
