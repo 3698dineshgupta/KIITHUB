@@ -3,6 +3,7 @@ import { PrismaAdapter } from '@auth/prisma-adapter'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
 import bcrypt from 'bcryptjs'
+import { cookies, headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/redis'
 
@@ -99,6 +100,38 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         ;(session.user as any).membershipExpiry = token.membershipExpiry
       }
       return session
+    },
+  },
+  events: {
+    // Fires once, only for brand-new accounts created by the PrismaAdapter —
+    // i.e. Google sign-in. Credentials registration creates its own user row
+    // directly in app/api/auth/register/route.ts and never hits this path.
+    async createUser({ user }) {
+      try {
+        // Dynamically imported: this whole module (and its Prisma-heavy
+        // transitive imports) is only ever needed here, inside a Node.js-
+        // runtime event handler — lib/auth.ts itself is also bundled into
+        // middleware.ts, which runs on the Edge Runtime on nearly every
+        // request, so a static top-level import here would bloat every
+        // single request's middleware bundle with code the edge path never
+        // executes.
+        const { generateUniqueReferralCode, creditReferral } = await import('@/lib/referral')
+        const referralCode = await generateUniqueReferralCode()
+        await prisma.user.update({ where: { id: user.id }, data: { referralCode } })
+
+        // The register page stashes ?ref=CODE in a cookie before redirecting
+        // to Google, since the OAuth round trip doesn't preserve query params.
+        const cookieStore = await cookies()
+        const ref = cookieStore.get('kiithub_ref')?.value
+        if (ref && user.id) {
+          const forwardedFor = (await headers()).get('x-forwarded-for')
+          const ipAddress = forwardedFor ? forwardedFor.split(',')[0].trim() : null
+          await creditReferral({ newUserId: user.id, referralCode: ref.toUpperCase(), ipAddress })
+        }
+      } catch (err) {
+        // Referral bookkeeping must never break account creation.
+        console.error('events.createUser referral handling failed:', err)
+      }
     },
   },
 })

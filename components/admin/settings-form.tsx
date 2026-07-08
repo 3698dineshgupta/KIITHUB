@@ -194,6 +194,26 @@ export function AdminSettingsForm({ settings }: Props) {
         </CardContent>
       </Card>
 
+      {/* Group 2.6: Referral Rewards */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base text-amber-600 font-semibold">Referral Rewards</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label className="mb-1.5 block">Referrals Required for Premium</Label>
+            <Input
+              value={values.referral_required_count ?? '10'}
+              onChange={e => set('referral_required_count', e.target.value)}
+              placeholder="10"
+              type="number"
+              min={1}
+            />
+            <p className="text-xs text-muted-foreground mt-1">Premium reward duration reuses the Validity Days setting above.</p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Group 3: Premium Features */}
       <Card>
         <CardHeader className="pb-3">

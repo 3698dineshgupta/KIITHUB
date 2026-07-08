@@ -3,12 +3,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import {
-  ZoomIn, ZoomOut, Maximize2, Minimize2, Loader2, ShieldAlert
+  ZoomIn, ZoomOut, Maximize2, Minimize2, Loader2, ShieldAlert, Bug
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { useDocumentLoaderStore } from '@/store'
+import { useDocumentLoaderStore, useBugReportStore } from '@/store'
+import { DocumentNavArrows } from '@/components/pdf/document-nav-arrows'
 
 // react-pdf bundles its own pinned pdfjs-dist internally, separate from (and
 // usually a different version than) this project's top-level pdfjs-dist
@@ -19,15 +20,26 @@ import { useDocumentLoaderStore } from '@/store'
 // so it always matches, regardless of what's installed at the top level.
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
+interface PDFViewerNavProps {
+  canPrev: boolean
+  canNext: boolean
+  prevLabel?: string
+  nextLabel?: string
+  onPrev: () => void
+  onNext: () => void
+  disabled?: boolean
+}
+
 interface PDFViewerProps {
   streamUrl: string
   title: string
   isPremium?: boolean
   totalPages?: number | null
   userEmail?: string
+  nav?: PDFViewerNavProps
 }
 
-export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail }: PDFViewerProps) {
+export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail, nav }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number | null>(totalPages || null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -36,14 +48,19 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail }
   const containerRef = useRef<HTMLDivElement>(null)
   const hasClosedLoaderRef = useRef(false)
 
-  // The full-screen "opening document" overlay (triggered by the card click
-  // that navigated here) is still open at this point — advance it through
-  // its remaining stages and only close it once the first page has actually
-  // painted, not merely when the request started.
+  // Runs on mount AND every time the caller swaps `streamUrl` to switch to a
+  // different document in-place (Suggested Materials / Prev-Next) — the
+  // component itself never remounts, so state left over from the previous
+  // document needs an explicit reset instead of relying on useState initializers.
   useEffect(() => {
+    setLoading(true)
+    setError(null)
+    setNumPages(totalPages || null)
+    hasClosedLoaderRef.current = false
     const { token, setStage } = useDocumentLoaderStore.getState()
     setStage(token, 'streaming')
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streamUrl])
 
   const closeDocumentLoader = () => {
     if (hasClosedLoaderRef.current) return
@@ -120,6 +137,11 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail }
       )}
       style={{ minHeight: fullscreen ? '100vh' : 600 }}
     >
+      {/* Prev/Next material navigation — lives inside this container (not a
+          sibling) so it stays visible and correctly stacked when the reader
+          toggles fullscreen. */}
+      {nav && <DocumentNavArrows {...nav} />}
+
       {/* Toolbar */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur-sm z-30 select-none">
         <span className="text-sm font-semibold truncate max-w-[200px] sm:max-w-sm flex items-center gap-1.5">
@@ -138,6 +160,15 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail }
           </Button>
           <Button variant="ghost" size="icon" className="h-8 w-8 ml-1 cursor-pointer" onClick={handleFullscreen} title="Fullscreen">
             {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 cursor-pointer"
+            onClick={() => useBugReportStore.getState().open(typeof window !== 'undefined' ? window.location.href : undefined)}
+            title="Report an issue with this document"
+          >
+            <Bug className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -172,40 +203,13 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail }
           {Array.from({ length: numPages || 0 }).map((_, idx) => {
             const pageNum = idx + 1
             return (
-              <div key={pageNum} className="relative shadow-2xl border border-zinc-800 rounded-lg overflow-hidden bg-white max-w-full">
-                <Page
-                  pageNumber={pageNum}
-                  scale={zoom}
-                  renderTextLayer={false}
-                  renderAnnotationLayer={false}
-                  onRenderSuccess={pageNum === 1 ? closeDocumentLoader : undefined}
-                  loading={
-                    <div className="w-[500px] h-[700px] max-w-full bg-zinc-950/20 animate-pulse flex items-center justify-center text-xs text-muted-foreground">
-                      Rendering Page {pageNum}...
-                    </div>
-                  }
-                />
-                
-                {/* Embedded Watermark over canvas */}
-                {userEmail && (
-                  <div
-                    className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center overflow-hidden"
-                    aria-hidden
-                  >
-                    <div
-                      className="text-zinc-950/[0.05] dark:text-white/[0.03] font-black uppercase select-none tracking-widest text-center"
-                      style={{
-                        transform: 'rotate(-30deg)',
-                        fontSize: `${Math.round(20 * zoom)}px`,
-                        lineHeight: '1.8'
-                      }}
-                    >
-                      {userEmail} • KIIT HUB PRO<br/>
-                      {userEmail} • SECURE STREAM
-                    </div>
-                  </div>
-                )}
-              </div>
+              <LazyPageSlot
+                key={`${streamUrl}-${pageNum}`}
+                pageNumber={pageNum}
+                zoom={zoom}
+                userEmail={userEmail}
+                onRenderSuccess={pageNum === 1 ? closeDocumentLoader : undefined}
+              />
             )
           })}
         </Document>
@@ -215,6 +219,78 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail }
       <div className="px-4 py-2.5 border-t bg-muted/30 text-[10px] sm:text-xs text-muted-foreground text-center font-medium select-none">
         🔒 SECURE DOCUMENT VIEWER · PRINTING & SCREEN COPIES STRICTLY RESTRICTED · SYSTEM AUDITED
       </div>
+    </div>
+  )
+}
+
+interface LazyPageSlotProps {
+  pageNumber: number
+  zoom: number
+  userEmail?: string
+  onRenderSuccess?: () => void
+}
+
+// Only the first two pages mount immediately (page 1 must render to close the
+// full-screen loader); the rest wait for an IntersectionObserver hit before
+// mounting <Page>, so a long document doesn't pay to render every canvas at once.
+function LazyPageSlot({ pageNumber, zoom, userEmail, onRenderSuccess }: LazyPageSlotProps) {
+  const [visible, setVisible] = useState(pageNumber <= 2)
+  const slotRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (visible) return
+    const el = slotRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0]?.isIntersecting) {
+          setVisible(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '1000px 0px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [visible])
+
+  return (
+    <div ref={slotRef} className="relative shadow-2xl border border-zinc-800 rounded-lg overflow-hidden bg-white max-w-full">
+      {visible ? (
+        <Page
+          pageNumber={pageNumber}
+          scale={zoom}
+          renderTextLayer={false}
+          renderAnnotationLayer={false}
+          onRenderSuccess={onRenderSuccess}
+          loading={
+            <div className="w-[500px] h-[700px] max-w-full bg-zinc-950/20 animate-pulse flex items-center justify-center text-xs text-muted-foreground">
+              Rendering Page {pageNumber}...
+            </div>
+          }
+        />
+      ) : (
+        <div className="w-[500px] h-[700px] max-w-full bg-zinc-950/20 animate-pulse flex items-center justify-center text-xs text-muted-foreground">
+          Page {pageNumber}
+        </div>
+      )}
+
+      {/* Embedded Watermark over canvas */}
+      {visible && userEmail && (
+        <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center overflow-hidden" aria-hidden>
+          <div
+            className="text-zinc-950/[0.05] dark:text-white/[0.03] font-black uppercase select-none tracking-widest text-center"
+            style={{
+              transform: 'rotate(-30deg)',
+              fontSize: `${Math.round(20 * zoom)}px`,
+              lineHeight: '1.8'
+            }}
+          >
+            {userEmail} • KIIT HUB PRO<br/>
+            {userEmail} • SECURE STREAM
+          </div>
+        </div>
+      )}
     </div>
   )
 }

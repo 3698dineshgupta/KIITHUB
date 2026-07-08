@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { BookOpen, Github, Twitter, Mail } from 'lucide-react'
+import { ReportBugTrigger } from '@/components/bugs/report-bug-trigger'
 
 export function Footer() {
   return (
@@ -15,12 +16,17 @@ export function Footer() {
           </div>
           {[
             { title: 'Resources', links: [{ href:'/notes', label:'Notes' },{ href:'/pyq', label:'PYQs' },{ href:'/calculator', label:'SGPA/CGPA' },{ href:'/premium', label:'Premium' }] },
-            { title: 'Platform', links: [{ href:'/dashboard', label:'Dashboard' },{ href:'/register', label:'Sign Up' },{ href:'/login', label:'Login' }] },
+            { title: 'Platform', links: [{ href:'/dashboard', label:'Dashboard' },{ href:'/register', label:'Sign Up' },{ href:'/login', label:'Login' },{ href:'/profile', label:'Refer & Earn Premium' },{ href:'/help', label:'Help & Support' }] },
             { title: 'Legal', links: [{ href:'/privacy', label:'Privacy Policy' },{ href:'/terms', label:'Terms of Service' }] },
           ].map(col => (
             <div key={col.title}>
               <h3 className="font-semibold text-sm mb-3">{col.title}</h3>
-              <ul className="space-y-2">{col.links.map(l => <li key={l.href}><Link href={l.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">{l.label}</Link></li>)}</ul>
+              <ul className="space-y-2">
+                {col.links.map(l => <li key={l.href}><Link href={l.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">{l.label}</Link></li>)}
+                {col.title === 'Platform' && (
+                  <li><ReportBugTrigger variant="ghost" size="sm" className="!h-auto !p-0 text-sm text-muted-foreground hover:text-foreground font-normal" /></li>
+                )}
+              </ul>
             </div>
           ))}
         </div>

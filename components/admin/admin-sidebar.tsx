@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, FileText, Upload, Users, CreditCard,
-  Settings, BookOpen, ChevronRight, Shield, ShoppingBag,
+  Settings, BookOpen, ChevronRight, Shield, ShoppingBag, Gift, Bug,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -14,6 +14,8 @@ const items = [
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/payments', label: 'Payments', icon: CreditCard },
   { href: '/admin/merchandise', label: 'Merchandise', icon: ShoppingBag },
+  { href: '/admin/referrals', label: 'Referrals', icon: Gift },
+  { href: '/admin/bugs', label: 'Bug Reports', icon: Bug },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ]
 

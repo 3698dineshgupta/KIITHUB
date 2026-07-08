@@ -44,6 +44,49 @@ enum NotificationType {
   SYSTEM
   LISTING_APPROVED
   LISTING_REJECTED
+  REFERRAL_JOINED
+  REFERRAL_VALIDATED
+  REFERRAL_MILESTONE_CLOSE
+  REFERRAL_PREMIUM_ACTIVATED
+  BUG_REPORT_RECEIVED
+  BUG_REPORT_STATUS_CHANGED
+  BUG_REPORT_RESOLVED
+}
+
+enum ReferralStatus {
+  PENDING
+  VALID
+  INVALID
+}
+
+enum BugCategory {
+  UI_ISSUE
+  PERFORMANCE
+  PDF_ISSUE
+  LOGIN_PROBLEM
+  PAYMENT_ISSUE
+  PREMIUM_ISSUE
+  WRONG_CONTENT
+  MISSING_NOTES
+  MISSING_PYQS
+  SECURITY_ISSUE
+  FEATURE_REQUEST
+  OTHER
+}
+
+enum BugSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum BugStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  IN_PROGRESS
+  FIXED
+  CLOSED
 }
 
 enum ListingStatus {
@@ -72,32 +115,50 @@ enum MerchCategory {
 }
 
 model User {
-  id               String           @id @default(cuid())
-  name             String
-  email            String           @unique
-  emailVerified    DateTime?
-  password         String?
-  image            String?
-  college          String?
-  university       String?
-  role             Role             @default(STUDENT)
-  membershipStatus MembershipStatus @default(FREE)
-  membershipExpiry DateTime?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  accounts         Account[]
-  sessions         Session[]
-  bookmarks        Bookmark[]
-  downloads        Download[]
-  views            View[]
-  paymentRequests  PaymentRequest[]
-  notifications    Notification[]
-  auditLogs        AuditLog[]
-  merchListings    MerchListing[]   @relation("MerchSeller")
-  merchSaves       MerchSave[]
+  id                 String           @id @default(cuid())
+  name               String
+  email              String           @unique
+  emailVerified      DateTime?
+  password           String?
+  image              String?
+  college            String?
+  university         String?
+  role               Role             @default(STUDENT)
+  membershipStatus   MembershipStatus @default(FREE)
+  membershipExpiry   DateTime?
+  isBanned           Boolean          @default(false)
+  // @default(cuid()) exists so NextAuth's PrismaAdapter — which creates
+  // Google sign-in users directly via prisma.user.create() and has no idea
+  // this column exists — never violates the NOT NULL/unique constraint.
+  // events.createUser in lib/auth.ts immediately replaces it with a proper
+  // short generated code.
+  referralCode       String           @unique @default(cuid())
+  referredById       String?
+  referralRewardedAt DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  accounts           Account[]
+  sessions           Session[]
+  bookmarks          Bookmark[]
+  downloads          Download[]
+  views              View[]
+  paymentRequests    PaymentRequest[]
+  notifications      Notification[]
+  auditLogs          AuditLog[]
+  merchListings      MerchListing[]   @relation("MerchSeller")
+  merchSaves         MerchSave[]
+  referredBy         User?            @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referredUsers      User[]           @relation("Referrals")
+  referralsMade      Referral[]       @relation("ReferrerOf")
+  referralAsReferred Referral?        @relation("ReferredAs")
+  referralRewards    ReferralReward[]
+  bugReports         BugReport[]
+  bugComments        BugComment[]
 
   @@index([email])
   @@index([membershipStatus])
+  @@index([referralCode])
+  @@index([referredById])
 }
 
 model Account {
@@ -438,4 +499,80 @@ model MerchSave {
 
   @@unique([userId, listingId])
   @@index([listingId])
+}
+
+model Referral {
+  id            String         @id @default(cuid())
+  referrerId    String
+  referrer      User           @relation("ReferrerOf", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredId    String         @unique
+  referred      User           @relation("ReferredAs", fields: [referredId], references: [id], onDelete: Cascade)
+  status        ReferralStatus @default(PENDING)
+  ipAddress     String?
+  invalidReason String?
+  validatedAt   DateTime?
+  createdAt     DateTime       @default(now())
+
+  @@index([referrerId, status])
+  @@index([createdAt])
+}
+
+model ReferralReward {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  milestone   Int
+  grantedDays Int
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model BugReport {
+  id               String       @id @default(cuid())
+  bugId            String       @unique
+  userId           String?
+  user             User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  title            String
+  category         BugCategory
+  description      String
+  stepsToReproduce String?
+  expectedBehavior String?
+  actualBehavior   String?
+  severity         BugSeverity  @default(MEDIUM)
+  status           BugStatus    @default(SUBMITTED)
+  priority         Int?
+  pageUrl          String?
+  browserInfo      String?
+  deviceInfo       String?
+  os               String?
+  screenResolution String?
+  appVersion       String?
+  contactEmail     String?
+  screenshotUrl    String?
+  recordingUrl     String?
+  internalNotes    String?
+  ipAddress        String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  comments         BugComment[]
+
+  @@index([status])
+  @@index([category])
+  @@index([severity])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model BugComment {
+  id        String    @id @default(cuid())
+  bugId     String
+  bug       BugReport @relation(fields: [bugId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  isAdmin   Boolean   @default(false)
+  message   String
+  createdAt DateTime  @default(now())
+
+  @@index([bugId])
 }

@@ -82,3 +82,20 @@ export const useDocumentLoaderStore = create<DocumentLoaderState>((set, get) => 
     set({ isOpen: false })
   },
 }))
+
+interface BugReportState {
+  isOpen: boolean
+  pageUrl: string
+  open: (pageUrl?: string) => void
+  close: () => void
+}
+
+// A single globally-mounted <ReportBugDialog/> (see app/layout.tsx) reads
+// this store, so every trigger point (footer, profile, help page, document
+// viewer) can just call open() instead of each rendering its own modal.
+export const useBugReportStore = create<BugReportState>((set) => ({
+  isOpen: false,
+  pageUrl: '',
+  open: (pageUrl) => set({ isOpen: true, pageUrl: pageUrl ?? (typeof window !== 'undefined' ? window.location.pathname : '') }),
+  close: () => set({ isOpen: false }),
+}))

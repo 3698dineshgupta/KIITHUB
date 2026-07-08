@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import Link from 'next/link'
 
@@ -14,12 +14,22 @@ import { Loader2, AlertCircle, Globe } from 'lucide-react'
 
 export function RegisterForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const ref = searchParams.get('ref')
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Google sign-up creates the account via NextAuth's adapter, not this
+  // form's own POST — the referral code needs to survive that redirect, so
+  // it's stashed in a short-lived cookie and picked up server-side in
+  // lib/auth.ts's events.createUser.
+  useEffect(() => {
+    if (ref) document.cookie = `kiithub_ref=${encodeURIComponent(ref)}; path=/; max-age=1800; SameSite=Lax`
+  }, [ref])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,7 +46,7 @@ export function RegisterForm() {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password })
+        body: JSON.stringify({ name, email, password, ref: ref ?? undefined })
       })
 
       const data = await res.json()
