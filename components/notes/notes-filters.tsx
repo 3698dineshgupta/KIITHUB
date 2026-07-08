@@ -1,6 +1,6 @@
 'use client'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { useCallback, useTransition } from 'react'
+import { useCallback, useMemo, useTransition } from 'react'
 import { Search, X, SlidersHorizontal, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -47,13 +47,48 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
   const hasFilters = sp.size > 0
 
   const branchId = sp.get('branch') ?? ''
-  const filteredSubjects = branchId
-    ? subjects.filter(s => s.branchId === branchId)
-    : subjects
-  
-  // Deduplicate subjects by name (same subject can exist under multiple branches)
-  const uniqueSubjects = filteredSubjects.filter(
-    (s, i, arr) => arr.findIndex(x => x.name === s.name) === i
+  const semesterId = sp.get('semester') ?? ''
+
+  // Subjects belonging to the currently selected branch AND semester —
+  // purely client-side over data already fetched once server-side, so this
+  // is effectively instant and never triggers a new request.
+  const uniqueSubjects = useMemo(() => {
+    const filtered = subjects.filter(s =>
+      (!branchId || s.branchId === branchId) &&
+      (!semesterId || s.semesterId === semesterId)
+    )
+    // Deduplicate subjects by name (same subject can exist under multiple branches)
+    return filtered.filter((s, i, arr) => arr.findIndex(x => x.name === s.name) === i)
+  }, [subjects, branchId, semesterId])
+
+  // Branch/semester changes can invalidate the current subject selection —
+  // drop it if the selected subject no longer belongs to the new combo,
+  // matching the semester/branch dropdowns actually filtering the subject
+  // list instead of just cosmetically narrowing it.
+  const updateBranchOrSemester = useCallback(
+    (key: 'branch' | 'semester', value: string | null) => {
+      const params = new URLSearchParams(sp.toString())
+      if (value) params.set(key, value)
+      else params.delete(key)
+      params.delete('page')
+
+      const nextBranchId = key === 'branch' ? (value ?? '') : (sp.get('branch') ?? '')
+      const nextSemesterId = key === 'semester' ? (value ?? '') : (sp.get('semester') ?? '')
+      const currentSubjectName = sp.get('subject')
+      if (currentSubjectName) {
+        const stillValid = subjects.some(s =>
+          s.name === currentSubjectName &&
+          (!nextBranchId || s.branchId === nextBranchId) &&
+          (!nextSemesterId || s.semesterId === nextSemesterId)
+        )
+        if (!stillValid) params.delete('subject')
+      }
+
+      startTransition(() => {
+        router.push(`${pathname}?${params.toString()}`)
+      })
+    },
+    [router, pathname, sp, subjects]
   )
 
   return (
@@ -79,7 +114,7 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
       <div className="flex flex-wrap gap-3 items-center">
         <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
 
-        <Select value={sp.get('branch') ?? ''} onValueChange={v => updateParam('branch', v === 'all' ? null : v)} disabled={isPending}>
+        <Select value={sp.get('branch') ?? ''} onValueChange={v => updateBranchOrSemester('branch', v === 'all' ? null : v)} disabled={isPending}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Branch" />
           </SelectTrigger>
@@ -89,7 +124,7 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
           </SelectContent>
         </Select>
 
-        <Select value={sp.get('semester') ?? ''} onValueChange={v => updateParam('semester', v === 'all' ? null : v)} disabled={isPending}>
+        <Select value={sp.get('semester') ?? ''} onValueChange={v => updateBranchOrSemester('semester', v === 'all' ? null : v)} disabled={isPending}>
           <SelectTrigger className="w-36">
             <SelectValue placeholder="Semester" />
           </SelectTrigger>
@@ -99,9 +134,9 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
           </SelectContent>
         </Select>
 
-        <Select value={sp.get('subject') ?? ''} onValueChange={v => updateParam('subject', v === 'all' ? null : v)} disabled={isPending}>
+        <Select value={sp.get('subject') ?? ''} onValueChange={v => updateParam('subject', v === 'all' ? null : v)} disabled={isPending || uniqueSubjects.length === 0}>
           <SelectTrigger className="w-44">
-            <SelectValue placeholder="Subject" />
+            <SelectValue placeholder={uniqueSubjects.length === 0 ? 'No subjects available' : 'Subject'} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Subjects</SelectItem>

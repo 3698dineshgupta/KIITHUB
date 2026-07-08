@@ -6,6 +6,7 @@ import { signStreamToken } from '@/lib/jwt'
 import { isPremiumActive } from '@/lib/utils'
 import { PDFViewer } from '@/components/pdf/pdf-viewer'
 import { PremiumGate } from '@/components/pdf/premium-gate'
+import { CloseDocumentLoader } from '@/components/pdf/close-document-loader'
 import { NoteMetaCard } from '@/components/notes/note-meta-card'
 import { JsonLd, SITE_URL, breadcrumbJsonLd } from '@/components/seo/json-ld'
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
@@ -56,6 +57,7 @@ export default async function PYQViewPage({ params }: { params: Promise<{ slug: 
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
         <JsonLd data={breadcrumb} />
         <JsonLd data={creativeWork} />
+        <CloseDocumentLoader />
         <NoteMetaCard note={{ ...pyq, contentType: 'PYQ', tags: [] }} />
         <PremiumGate />
       </div>
@@ -81,7 +83,7 @@ export default async function PYQViewPage({ params }: { params: Promise<{ slug: 
       <NoteMetaCard note={{ ...pyq, contentType: 'PYQ', tags: [] }} />
       {streamToken
         ? <PDFViewer streamUrl={`/api/stream/pyq/${pyq.id}?token=${streamToken}`} title={pyq.title} isPremium={pyq.isPremium} userEmail={user?.email ?? ''} />
-        : <div className="rounded-xl border p-8 text-center"><p className="font-medium mb-3">Sign in to view this PYQ</p><Link href="/login" className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium">Sign in</Link></div>
+        : <div className="rounded-xl border p-8 text-center"><CloseDocumentLoader /><p className="font-medium mb-3">Sign in to view this PYQ</p><Link href="/login" className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium">Sign in</Link></div>
       }
     </div>
   )

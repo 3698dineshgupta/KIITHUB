@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { useDocumentLoaderStore } from '@/store'
 
 // react-pdf bundles its own pinned pdfjs-dist internally, separate from (and
 // usually a different version than) this project's top-level pdfjs-dist
@@ -33,6 +34,23 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail }
   const [fullscreen, setFullscreen] = useState(false)
   const [zoom, setZoom] = useState(1.0) // 100%
   const containerRef = useRef<HTMLDivElement>(null)
+  const hasClosedLoaderRef = useRef(false)
+
+  // The full-screen "opening document" overlay (triggered by the card click
+  // that navigated here) is still open at this point — advance it through
+  // its remaining stages and only close it once the first page has actually
+  // painted, not merely when the request started.
+  useEffect(() => {
+    const { token, setStage } = useDocumentLoaderStore.getState()
+    setStage(token, 'streaming')
+  }, [])
+
+  const closeDocumentLoader = () => {
+    if (hasClosedLoaderRef.current) return
+    hasClosedLoaderRef.current = true
+    const { token, closeLoader } = useDocumentLoaderStore.getState()
+    closeLoader(token)
+  }
 
   // Disable right-click, selection, and printing
   useEffect(() => {
@@ -80,12 +98,17 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail }
     setNumPages(numPages)
     setLoading(false)
     setError(null)
+    const { token, setStage } = useDocumentLoaderStore.getState()
+    setStage(token, 'rendering')
   }
 
   const onDocumentLoadError = (err: unknown) => {
     console.error('PDF JS load error:', err)
     setLoading(false)
     setError('Failed to load document. The secure token may have expired. Please refresh the page.')
+    // Let the user see the in-viewer error instead of hiding it behind the
+    // full-screen overlay forever.
+    closeDocumentLoader()
   }
 
   return (
@@ -155,6 +178,7 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail }
                   scale={zoom}
                   renderTextLayer={false}
                   renderAnnotationLayer={false}
+                  onRenderSuccess={pageNum === 1 ? closeDocumentLoader : undefined}
                   loading={
                     <div className="w-[500px] h-[700px] max-w-full bg-zinc-950/20 animate-pulse flex items-center justify-center text-xs text-muted-foreground">
                       Rendering Page {pageNum}...

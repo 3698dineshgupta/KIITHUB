@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn, formatRelativeTime, formatBytes } from '@/lib/utils'
 import { useState } from 'react'
+import { useOpenDocument } from '@/hooks/use-open-document'
 
 const TYPE_COLORS: Record<string, string> = {
   NOTE: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
@@ -24,6 +25,7 @@ interface NoteCardProps { note: any; showBookmark?: boolean }
 export function NoteCard({ note, showBookmark = false }: NoteCardProps) {
   const [bookmarked, setBookmarked] = useState(note.isBookmarked ?? false)
   const [loading, setLoading] = useState(false)
+  const handleOpen = useOpenDocument()
 
   const toggleBookmark = async (e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation()
@@ -37,7 +39,7 @@ export function NoteCard({ note, showBookmark = false }: NoteCardProps) {
   }
 
   return (
-    <Link href={note.contentType === 'PYQ' ? `/pyq/${note.slug}` : `/notes/${note.slug}`}>
+    <Link href={note.contentType === 'PYQ' ? `/pyq/${note.slug}` : `/notes/${note.slug}`} onClick={handleOpen(note.title)}>
       <Card className={cn('h-full hover:shadow-lg hover:-translate-y-1 transition-all duration-200 cursor-pointer group overflow-hidden', note.isPremium && 'border-amber-300 dark:border-amber-700')}>
         {note.isPremium && (
           <div className="h-1 bg-gradient-to-r from-amber-400 to-orange-500" />

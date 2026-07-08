@@ -7,6 +7,7 @@ import { signStreamToken } from '@/lib/jwt'
 import { isPremiumActive } from '@/lib/utils'
 import { PDFViewer } from '@/components/pdf/pdf-viewer'
 import { PremiumGate } from '@/components/pdf/premium-gate'
+import { CloseDocumentLoader } from '@/components/pdf/close-document-loader'
 import { NoteMetaCard } from '@/components/notes/note-meta-card'
 import { cache, CACHE_KEYS } from '@/lib/redis'
 import { JsonLd, SITE_URL, breadcrumbJsonLd } from '@/components/seo/json-ld'
@@ -70,6 +71,7 @@ export default async function NoteViewPage({ params }: { params: Promise<{ slug:
       <div className="max-w-5xl mx-auto px-4 py-8">
         <JsonLd data={breadcrumb} />
         <JsonLd data={creativeWork} />
+        <CloseDocumentLoader />
         <NoteMetaCard note={note} />
         <PremiumGate />
       </div>
@@ -112,6 +114,7 @@ export default async function NoteViewPage({ params }: { params: Promise<{ slug:
         />
       ) : (
         <div className="rounded-xl border p-8 text-center">
+          <CloseDocumentLoader />
           <p className="font-medium mb-3">Sign in to view this PDF</p>
           <Link href="/login" className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90">Sign in</Link>
         </div>

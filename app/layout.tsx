@@ -5,6 +5,7 @@ import { Providers } from '@/components/layout/providers'
 import { Navbar } from '@/components/layout/navbar'
 import { Footer } from '@/components/layout/footer'
 import { JsonLd, SITE_URL, SITE_NAME } from '@/components/seo/json-ld'
+import { DocumentLoadingOverlay } from '@/components/pdf/document-loading-overlay'
 
 const inter = Inter({ subsets: ['latin'], display: 'swap' })
 
@@ -74,6 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Navbar />
           <main className="flex-1 pt-16">{children}</main>
           <Footer />
+          <DocumentLoadingOverlay />
         </Providers>
       </body>
     </html>
