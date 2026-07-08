@@ -18,11 +18,15 @@ const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || ''
 // custom-rejection-reason replies. Isolated to MerchListing rows only.
 export async function POST(req: NextRequest) {
   try {
-    if (WEBHOOK_SECRET) {
-      const header = req.headers.get('x-telegram-bot-api-secret-token')
-      if (header !== WEBHOOK_SECRET) {
-        return NextResponse.json({ ok: false }, { status: 401 })
-      }
+    // Fail closed: an unset secret must reject every request, not accept
+    // everything. Telegram's from.id in the payload isn't cryptographically
+    // verified by anything else here — isAuthorizedTelegramAdmin() checks it
+    // against a numeric ID that isn't secret (visible to anyone who's ever
+    // seen that admin in a Telegram group), so this header is the only real
+    // proof a request actually came from Telegram.
+    const header = req.headers.get('x-telegram-bot-api-secret-token')
+    if (!WEBHOOK_SECRET || header !== WEBHOOK_SECRET) {
+      return NextResponse.json({ ok: false }, { status: 401 })
     }
 
     const update = await req.json()

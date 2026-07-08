@@ -18,7 +18,9 @@ export function ProfileForm({ user }: { user: any }) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [premiumPrice, setPremiumPrice] = useState('299')
+  const [premiumDays, setPremiumDays] = useState('365')
   const premium = isPremiumActive(user.membershipStatus, user.membershipExpiry)
+  const duration = premiumDays === '365' ? 'yr' : premiumDays === '30' ? 'mo' : `${premiumDays} days`
 
   useEffect(() => {
     ;(async () => {
@@ -27,6 +29,7 @@ export function ProfileForm({ user }: { user: any }) {
         if (!res.ok) return
         const data = await res.json()
         if (data?.premium_price) setPremiumPrice(String(data.premium_price))
+        if (data?.premium_days) setPremiumDays(String(data.premium_days))
       } catch {}
     })()
   }, [])
@@ -63,7 +66,7 @@ export function ProfileForm({ user }: { user: any }) {
             </p>
           </div>
           {!premium && user.membershipStatus !== 'PENDING' && (
-            <Link href="/premium"><Button variant="premium" size="sm" className="gap-2"><Crown className="h-4 w-4"/>Upgrade — ₹{premiumPrice}/yr</Button></Link>
+            <Link href="/premium"><Button variant="premium" size="sm" className="gap-2"><Crown className="h-4 w-4"/>Upgrade — ₹{premiumPrice}/{duration}</Button></Link>
           )}
         </CardContent>
       </Card>

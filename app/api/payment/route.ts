@@ -3,8 +3,6 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { sendPaymentProofToTelegram } from '@/lib/telegram'
 import { sendPremiumApprovedEmail } from '@/lib/mail'
-import { writeFile, mkdir } from 'fs/promises'
-import path from 'path'
 
 // Allow up to 20 MB for high-res payment screenshots
 export const config = {
@@ -136,8 +134,11 @@ export async function PATCH(req: NextRequest) {
     })
     if (!payment) return NextResponse.json({ success: false, error: 'Payment not found', code: 404 }, { status: 404 })
 
-    // Use admin-provided days, or fall back to the days stored when the user submitted payment
-    const membershipDays = Number(body.membershipDays ?? payment.membershipDays ?? 90)
+    // Use admin-provided days, or fall back to the days stored when the user submitted payment.
+    // Clamped to a sane range so a typo (or a negative/absurd value) can't grant
+    // a broken or effectively-infinite membership.
+    const rawDays = Number(body.membershipDays ?? payment.membershipDays ?? 90)
+    const membershipDays = Number.isFinite(rawDays) ? Math.min(3650, Math.max(1, Math.round(rawDays))) : 90
 
     if (action === 'approve') {
       const expiry = new Date()

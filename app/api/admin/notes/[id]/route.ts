@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { telegramDelete } from '@/lib/telegram'
@@ -73,7 +74,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     
     await cache.del(CACHE_KEYS.noteDetail(id))
-    await cache.del('home:data')
+    revalidatePath('/')
 
     return NextResponse.json({ success: true, note: item })
   } catch (err: any) {
@@ -131,7 +132,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     }
     
     await cache.del(CACHE_KEYS.noteDetail(id))
-    await cache.del('home:data')
+    revalidatePath('/')
 
     // Audit log
     await prisma.auditLog.create({

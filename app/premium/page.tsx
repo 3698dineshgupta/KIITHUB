@@ -2,7 +2,10 @@ import { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 import { PremiumContent, type PremiumSettings } from '@/components/premium/premium-content'
 
-export const dynamic = 'force-dynamic'
+// Settings are admin-configured and rarely change; PremiumContent reads the
+// signed-in user's own premium status client-side via useSession(), so this
+// server-rendered shell has no per-request dependence and can be edge-cached.
+export const revalidate = 300
 
 async function getSettings(): Promise<PremiumSettings> {
   const rows = await prisma.setting.findMany().catch(() => [])

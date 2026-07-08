@@ -1,8 +1,14 @@
 import { SignJWT, jwtVerify } from 'jose'
 
-const secret = new TextEncoder().encode(
-  process.env.NEXTAUTH_SECRET ?? 'fallback-secret-change-in-production'
-)
+// No hardcoded fallback: a secret baked into source code is public the
+// moment this repo is pushed anywhere, and would let anyone forge a valid
+// stream token (bypassing premium gating for any note/PYQ) if
+// NEXTAUTH_SECRET were ever missing in an environment. Failing loudly here
+// is safer than silently signing tokens with a well-known key.
+if (!process.env.NEXTAUTH_SECRET) {
+  throw new Error('NEXTAUTH_SECRET environment variable is not set — required to sign/verify stream tokens.')
+}
+const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET)
 
 export interface StreamToken {
   resourceId: string

@@ -44,7 +44,14 @@ export async function PATCH(req: NextRequest) {
       data = { membershipStatus: 'FREE', membershipExpiry: null }
     } else if (action === 'make_admin') { data = { role: 'ADMIN' }
     } else if (action === 'make_student') { data = { role: 'STUDENT' } }
+    else return NextResponse.json({ success: false, error: 'Invalid action', code: 400 }, { status: 400 })
+
     const user = await prisma.user.update({ where: { id: userId }, data, select: { id:true,name:true,role:true,membershipStatus:true } })
+    // Role changes and manual premium grants are sensitive enough to need an
+    // audit trail — every other admin mutation route already writes one.
+    await prisma.auditLog.create({
+      data: { userId: admin.id, action: `ADMIN_${action.toUpperCase()}`, resource: 'user', resourceId: userId },
+    })
     return NextResponse.json({ success: true, user })
   } catch (err: any) {
     const msg = String(err?.message ?? '')

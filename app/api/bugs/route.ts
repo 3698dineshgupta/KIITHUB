@@ -7,6 +7,7 @@ import { generateBugId, BUG_CATEGORIES, BUG_SEVERITIES } from '@/lib/bugs'
 import { notifyBugReportReceived } from '@/lib/bug-notify'
 import { getRequestIp } from '@/lib/request-ip'
 import { checkRateLimit } from '@/lib/ratelimit'
+import { isAllowedImageType } from '@/lib/file-validation'
 
 const MAX_SCREENSHOT_SIZE = 5 * 1024 * 1024 // 5 MB
 const MAX_RECORDING_SIZE = 30 * 1024 * 1024 // 30 MB
@@ -61,8 +62,8 @@ export async function POST(req: NextRequest) {
     let screenshotUrl: string | undefined
     const screenshot = form.get('screenshot')
     if (screenshot instanceof File && screenshot.size > 0) {
-      if (!screenshot.type.startsWith('image/')) {
-        return NextResponse.json({ success: false, error: 'Screenshot must be an image file', code: 400 }, { status: 400 })
+      if (!isAllowedImageType(screenshot.type)) {
+        return NextResponse.json({ success: false, error: 'Screenshot must be a PNG, JPEG, WEBP, or GIF image', code: 400 }, { status: 400 })
       }
       if (screenshot.size > MAX_SCREENSHOT_SIZE) {
         return NextResponse.json({ success: false, error: 'Screenshot must be under 5 MB', code: 400 }, { status: 400 })

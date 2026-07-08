@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs'
 import { cookies, headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/redis'
+import { checkRateLimit } from '@/lib/ratelimit'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
@@ -28,6 +29,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
+
+        // Brute-force protection: caps guesses per account regardless of
+        // how many different IPs an attacker spreads them across, since
+        // that's the actual asset being protected here.
+        const email = (credentials.email as string).toLowerCase()
+        const withinBudget = await checkRateLimit(`login:${email}`, 10, 900)
+        if (!withinBudget) return null
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email as string },

@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { cloudinaryUploadImage } from '@/lib/cloudinary'
 import { sendListingForApproval } from '@/lib/telegram-merch'
 import { slugify } from '@/lib/utils'
+import { isAllowedImageType } from '@/lib/file-validation'
 import { z } from 'zod'
 
 export const config = {
@@ -113,7 +114,7 @@ export async function POST(req: NextRequest) {
     if (imageFiles.length === 0) return NextResponse.json({ success: false, error: 'At least one product image is required', code: 400 }, { status: 400 })
     if (imageFiles.length > MAX_IMAGES) return NextResponse.json({ success: false, error: `Maximum ${MAX_IMAGES} images allowed`, code: 400 }, { status: 400 })
     for (const f of imageFiles) {
-      if (!f.type.startsWith('image/')) return NextResponse.json({ success: false, error: 'Only image files are allowed', code: 400 }, { status: 400 })
+      if (!isAllowedImageType(f.type)) return NextResponse.json({ success: false, error: 'Only PNG, JPEG, WEBP, or GIF images are allowed', code: 400 }, { status: 400 })
       if (f.size > MAX_IMAGE_SIZE) return NextResponse.json({ success: false, error: 'Each image must be under 5 MB', code: 400 }, { status: 400 })
     }
 

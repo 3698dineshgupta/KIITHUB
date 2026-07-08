@@ -10,29 +10,62 @@ const nextConfig: NextConfig = {
   // affect production, where Strict Mode never double-invokes regardless.
   reactStrictMode: false,
   images: {
-    domains: [
-      'lh3.googleusercontent.com',
-      'avatars.githubusercontent.com',
-      'qbgmidxjhqznldfpvory.supabase.co',
-      'res.cloudinary.com'
+    // remotePatterns (not the deprecated `domains`) so each host is scoped
+    // to https and its actual path shape, rather than trusting any path on it.
+    remotePatterns: [
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+      { protocol: 'https', hostname: 'avatars.githubusercontent.com' },
+      { protocol: 'https', hostname: 'qbgmidxjhqznldfpvory.supabase.co' },
+      { protocol: 'https', hostname: 'res.cloudinary.com' },
     ],
-    formats: ['image/avif', 'image/webp']
+    formats: ['image/avif', 'image/webp'],
+    // Optimized image responses are immutable per unique query (url+width+
+    // quality) — cache them at the edge/browser for a day instead of
+    // Next's 60s default, cutting repeat-visit image requests entirely.
+    minimumCacheTTL: 86400,
   },
 
   async headers() {
+    // Every external resource this app actually loads, audited from source:
+    // - script/style: Next.js's own hydration bootstrap and Radix UI's
+    //   inline style attributes need 'unsafe-inline' (no nonce plumbing
+    //   exists yet); dev mode's Fast Refresh additionally needs 'unsafe-eval'.
+    // - img: next/image proxies Cloudinary/Supabase/Google avatars through
+    //   this origin, but a few raw <img> tags (admin QR code URL, local
+    //   object-URL previews) load arbitrary https/blob sources directly.
+    // - font: next/font self-hosts Google Fonts at build time — no
+    //   fonts.googleapis.com request ever happens at runtime.
+    // - worker: react-pdf's worker is fetched from unpkg.com (see
+    //   components/pdf/pdf-viewer.tsx for why it can't be self-hosted).
+    // - connect: every fetch() in this app is same-origin.
+    const isDev = process.env.NODE_ENV === 'development'
+    const csp = [
+      `default-src 'self'`,
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
+      `style-src 'self' 'unsafe-inline'`,
+      `img-src 'self' blob: data: https:`,
+      `font-src 'self'`,
+      `connect-src 'self'${isDev ? ' ws:' : ''}`,
+      `worker-src 'self' https://unpkg.com`,
+      `frame-ancestors 'self'`,
+      `base-uri 'self'`,
+      `form-action 'self'`,
+      `object-src 'none'`,
+    ].join('; ')
+
     return [
       {
-        // Site-wide baseline security headers. Deliberately not adding a
-        // Content-Security-Policy here — this app relies on Next.js inline
-        // hydration scripts, Google Fonts, and third-party image hosts, and
-        // a CSP tight enough to matter needs careful per-source auditing to
-        // avoid breaking things; left as a manual follow-up.
+        // Site-wide baseline security headers.
         source: '/:path*',
         headers: [
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+          { key: 'Content-Security-Policy', value: csp },
+          // Vercel already adds this for custom domains, but setting it here
+          // too keeps the app correctly secured if it's ever hosted elsewhere.
+          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
         ]
       },
       {

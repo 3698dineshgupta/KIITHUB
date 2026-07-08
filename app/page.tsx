@@ -5,11 +5,8 @@ import { StatsSection } from '@/components/home/stats'
 import { PremiumCTA } from '@/components/home/premium-cta'
 import { SGPAPreview } from '@/components/home/sgpa-preview'
 import { prisma } from '@/lib/prisma'
-import { cache } from '@/lib/redis'
 
 async function getHomeData() {
-  const cached = await cache.get<any>('home:data')
-  if (cached) return cached
   try {
     const [latestNotes, topNotes, semesters, stats] = await Promise.all([
       prisma.note.findMany({ where: { isPublished: true }, orderBy: { createdAt: 'desc' }, take: 8, include: { subject: true, branch: true, semester: true, tags: true } }),
@@ -17,9 +14,7 @@ async function getHomeData() {
       prisma.semester.findMany({ orderBy: { number: 'asc' }, include: { _count: { select: { notes: true, pyqs: true } } } }),
       prisma.$transaction([prisma.user.count(), prisma.note.count(), prisma.pYQ.count(), prisma.view.count()]),
     ])
-    const data = { latestNotes, topNotes, semesters, stats: { users: stats[0], notes: stats[1], pyqs: stats[2], views: stats[3] } }
-    await cache.set('home:data', data, 1800)
-    return data
+    return { latestNotes, topNotes, semesters, stats: { users: stats[0], notes: stats[1], pyqs: stats[2], views: stats[3] } }
   } catch (err) {
     // If DB is unreachable, return a safe fallback so the homepage doesn't crash.
     console.error('getHomeData error:', err)
@@ -27,7 +22,19 @@ async function getHomeData() {
   }
 }
 
-export const dynamic = "force-dynamic";
+// This page has no session/auth dependence — Navbar's user-specific bits are
+// a separate client component hydrated in the root layout. force-dynamic was
+// making every single visit pay a full serverless invocation + DB round trip;
+// ISR lets Vercel serve the rendered HTML straight from the edge CDN instead.
+// The manual Redis cache this used to layer on top is gone too — it silently
+// defeated ISR entirely (Next.js always treats a fetch()-based call, which is
+// what @upstash/redis issues under the hood, as dynamic and opts the whole
+// route out of static rendering, no matter what `revalidate` says), and is
+// redundant now that ISR caches the full HTML output anyway. Content changes
+// invalidate this immediately via revalidatePath('/') — see
+// app/api/upload/route.ts and app/api/admin/notes/[id]/route.ts — so this
+// number is really just the safety-net ceiling, not the typical staleness.
+export const revalidate = 1800;
 export default async function HomePage() {
   const data = await getHomeData()
   return (

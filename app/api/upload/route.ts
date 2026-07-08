@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { telegramUpload } from '@/lib/telegram'
@@ -166,7 +167,7 @@ export async function POST(req: NextRequest) {
       await prisma.auditLog.create({
         data: { userId: user.id, action: 'UPLOAD', resource: 'pyq', resourceId: pyq.id },
       })
-      await cache.del('home:data')
+      revalidatePath('/')
       return NextResponse.json({ success: true, pyq })
     }
 
@@ -201,7 +202,7 @@ export async function POST(req: NextRequest) {
       data: { userId: user.id, action: 'UPLOAD', resource: 'note', resourceId: note.id },
     })
 
-    await cache.del('home:data')
+    revalidatePath('/')
 
     return NextResponse.json({ success: true, note })
   } catch (err: any) {
