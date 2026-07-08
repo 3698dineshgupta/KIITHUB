@@ -67,6 +67,27 @@ export async function supabaseStream(
   return Buffer.from(arrayBuffer)
 }
 
+export async function supabaseCreateSignedUrl(
+  path: string,
+  bucketName: string = 'documents',
+  expiresInSeconds: number = 60
+): Promise<string> {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Supabase environment variables are not set.')
+  }
+
+  const { data, error } = await supabase.storage
+    .from(bucketName)
+    .createSignedUrl(path, expiresInSeconds)
+
+  if (error || !data) {
+    console.error('Supabase signed URL error detail:', error)
+    throw new Error(`Supabase signed URL failed: ${error?.message ?? 'unknown error'}`)
+  }
+
+  return data.signedUrl
+}
+
 export async function supabaseDelete(
   path: string,
   bucketName: string = 'documents'

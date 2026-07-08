@@ -32,6 +32,7 @@ export const cache = {
 // Cache key factories
 export const CACHE_KEYS = {
   telegramUrl: (fileId: string) => `tg:url:${fileId}`,
+  pdfBytes: (fileId: string) => `pdf:bytes:${fileId}`,
   noteDetail: (id: string) => `note:${id}`,
   pyqDetail: (id: string) => `pyq:${id}`,
   userPermission: (userId: string) => `perm:${userId}`,

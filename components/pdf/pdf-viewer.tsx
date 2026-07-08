@@ -9,8 +9,13 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
-// Bulletproof CDN Worker configuration
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+// Self-hosted worker (served from our own origin via webpack's asset handling)
+// instead of an external CDN — removes a third-party DNS/TLS round trip from
+// the critical path of opening the very first PDF.
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url
+).toString()
 
 interface PDFViewerProps {
   streamUrl: string

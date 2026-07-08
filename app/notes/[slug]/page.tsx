@@ -25,14 +25,21 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }
 }
 
+const devTiming = process.env.NODE_ENV !== 'production'
+
 export const dynamic = "force-dynamic";
 export default async function NoteViewPage({ params }: { params: Promise<{ slug: string }> }) {
+  const t0 = devTiming ? performance.now() : 0
   const { slug } = await params
-  const session = await auth()
-  const note = await prisma.note.findUnique({
-    where: { slug },
-    include: { subject: true, branch: true, semester: true, tags: true },
-  })
+  // auth() and the note lookup don't depend on each other — run concurrently.
+  const [session, note] = await Promise.all([
+    auth(),
+    prisma.note.findUnique({
+      where: { slug },
+      include: { subject: true, branch: true, semester: true, tags: true },
+    }),
+  ])
+  if (devTiming) console.log(`[notes/${slug}] auth+note fetched +${(performance.now() - t0).toFixed(0)}ms`)
   if (!note || !note.isPublished) notFound()
 
   const breadcrumb = breadcrumbJsonLd([
@@ -72,18 +79,22 @@ export default async function NoteViewPage({ params }: { params: Promise<{ slug:
   // Generate signed stream token
   let streamToken: string | null = null
   if (user) {
-    streamToken = await signStreamToken({
-      resourceId: note.id,
-      resourceType: 'note',
-      userId: user.id,
-      isPremium: userIsPremium,
-    })
-    // Record view
-    await prisma.$transaction([
-      prisma.view.create({ data: { userId: user.id, noteId: note.id } }),
-      prisma.note.update({ where: { id: note.id }, data: { viewCount: { increment: 1 } } }),
+    // Token signing and view-recording don't depend on each other.
+    const [signedToken] = await Promise.all([
+      signStreamToken({
+        resourceId: note.id,
+        resourceType: 'note',
+        userId: user.id,
+        isPremium: userIsPremium,
+      }),
+      prisma.$transaction([
+        prisma.view.create({ data: { userId: user.id, noteId: note.id } }),
+        prisma.note.update({ where: { id: note.id }, data: { viewCount: { increment: 1 } } }),
+      ]),
     ])
+    streamToken = signedToken
     await cache.del(CACHE_KEYS.noteDetail(note.id))
+    if (devTiming) console.log(`[notes/${slug}] token+view recorded +${(performance.now() - t0).toFixed(0)}ms`)
   }
 
   return (

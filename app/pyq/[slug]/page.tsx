@@ -21,10 +21,17 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     twitter: { card: 'summary_large_image', title: pyq.title, description },
   }
 }
+const devTiming = process.env.NODE_ENV !== 'production'
+
 export default async function PYQViewPage({ params }: { params: Promise<{ slug: string }> }) {
+  const t0 = devTiming ? performance.now() : 0
   const { slug } = await params
-  const session = await auth()
-  const pyq = await prisma.pYQ.findUnique({ where: { slug }, include: { subject: true, branch: true, semester: true } })
+  // auth() and the PYQ lookup don't depend on each other — run concurrently.
+  const [session, pyq] = await Promise.all([
+    auth(),
+    prisma.pYQ.findUnique({ where: { slug }, include: { subject: true, branch: true, semester: true } }),
+  ])
+  if (devTiming) console.log(`[pyq/${slug}] auth+pyq fetched +${(performance.now() - t0).toFixed(0)}ms`)
   if (!pyq || !pyq.isPublished) notFound()
   const user = session?.user?.id ? await prisma.user.findUnique({ where: { id: session.user.id } }).catch(() => null) : null
   const userIsPremium = user ? isPremiumActive(user.membershipStatus, user.membershipExpiry) : false
@@ -56,11 +63,16 @@ export default async function PYQViewPage({ params }: { params: Promise<{ slug: 
   }
   let streamToken: string | null = null
   if (user) {
-    streamToken = await signStreamToken({ resourceId: pyq.id, resourceType: 'pyq', userId: user.id, isPremium: userIsPremium })
-    await prisma.$transaction([
-      prisma.view.create({ data: { userId: user.id, pyqId: pyq.id } }),
-      prisma.pYQ.update({ where: { id: pyq.id }, data: { viewCount: { increment: 1 } } }),
+    // Token signing and view-recording don't depend on each other.
+    const [signedToken] = await Promise.all([
+      signStreamToken({ resourceId: pyq.id, resourceType: 'pyq', userId: user.id, isPremium: userIsPremium }),
+      prisma.$transaction([
+        prisma.view.create({ data: { userId: user.id, pyqId: pyq.id } }),
+        prisma.pYQ.update({ where: { id: pyq.id }, data: { viewCount: { increment: 1 } } }),
+      ]),
     ])
+    streamToken = signedToken
+    if (devTiming) console.log(`[pyq/${slug}] token+view recorded +${(performance.now() - t0).toFixed(0)}ms`)
   }
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
