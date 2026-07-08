@@ -9,13 +9,14 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
-// Self-hosted worker (served from our own origin via webpack's asset handling)
-// instead of an external CDN — removes a third-party DNS/TLS round trip from
-// the critical path of opening the very first PDF.
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-).toString()
+// react-pdf bundles its own pinned pdfjs-dist internally, separate from (and
+// usually a different version than) this project's top-level pdfjs-dist
+// dependency. Node's module resolution explicitly forbids package `exports`
+// wildcards from resolving into a nested node_modules path, so there's no
+// reliable way to self-host react-pdf's exact worker file — the worker MUST
+// be fetched using `pdfjs.version` (read from react-pdf's own bundled copy)
+// so it always matches, regardless of what's installed at the top level.
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
 interface PDFViewerProps {
   streamUrl: string
