@@ -36,29 +36,54 @@ async function getSupabaseBucket(): Promise<string> {
   return settingsMap.supabase_bucket || 'documents'
 }
 
-async function fetchUpstream(telegramFileId: string, telegramMsgId: string): Promise<Response> {
+// Telegram's CDN can return a 200 OK with a small HTML/JSON error body for an
+// expired file URL instead of a proper 4xx — trusting `res.ok` alone let a
+// stale cached URL silently serve a few-KB error page as if it were the real
+// (often much larger) PDF. Cross-check content-type and, when we know the
+// real file size from the DB, the size too.
+function isValidFileResponse(res: Response, expectedSize?: number | null): boolean {
+  if (!res.ok) return false
+  const contentType = (res.headers.get('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html') || contentType.includes('application/json')) return false
+  if (expectedSize && expectedSize > 0) {
+    const len = Number(res.headers.get('content-length') || 0)
+    if (len > 0 && Math.abs(len - expectedSize) > Math.max(2048, expectedSize * 0.01)) return false
+  }
+  return true
+}
+
+async function fetchUpstream(telegramFileId: string, telegramMsgId: string, expectedSize?: number | null): Promise<Response> {
   if (telegramMsgId === 'supabase') {
     const bucket = await getSupabaseBucket()
     const signedUrl = await supabaseCreateSignedUrl(telegramFileId, bucket, 60)
-    return fetch(signedUrl)
+    const res = await fetch(signedUrl)
+    if (!isValidFileResponse(res, expectedSize)) {
+      throw new Error(`Supabase file fetch returned unexpected content (status ${res.status}, type ${res.headers.get('content-type')})`)
+    }
+    return res
   }
 
   const urlCacheKey = CACHE_KEYS.telegramUrl(telegramFileId)
-  let fileUrl = await cache.get<string>(urlCacheKey)
-  if (fileUrl) {
-    const res = await fetch(fileUrl)
-    if (res.ok) return res
-    // Cached URL expired — fall through to refresh below
+  const cachedUrl = await cache.get<string>(urlCacheKey)
+  if (cachedUrl) {
+    const res = await fetch(cachedUrl)
+    if (isValidFileResponse(res, expectedSize)) return res
+    // Cached URL expired/invalid — fall through to refresh below
   }
-  fileUrl = await telegramGetFileUrl(telegramFileId)
-  await cache.set(urlCacheKey, fileUrl, 3300)
-  return fetch(fileUrl)
+  const freshUrl = await telegramGetFileUrl(telegramFileId)
+  await cache.set(urlCacheKey, freshUrl, 3300)
+  const freshRes = await fetch(freshUrl)
+  if (!isValidFileResponse(freshRes, expectedSize)) {
+    throw new Error(`Telegram file fetch returned unexpected content (status ${freshRes.status}, type ${freshRes.headers.get('content-type')})`)
+  }
+  return freshRes
 }
 
 export interface StreamablePdf {
   telegramFileId: string
   telegramMsgId: string
   title: string
+  fileSize?: number | null
 }
 
 /**
@@ -84,9 +109,9 @@ export async function buildPdfResponse(doc: StreamablePdf): Promise<NextResponse
   }
   mark('cache miss, fetching upstream')
 
-  const upstreamRes = await fetchUpstream(doc.telegramFileId, doc.telegramMsgId)
-  if (!upstreamRes.ok || !upstreamRes.body) {
-    throw new Error(`Upstream document fetch failed (${upstreamRes.status})`)
+  const upstreamRes = await fetchUpstream(doc.telegramFileId, doc.telegramMsgId, doc.fileSize)
+  if (!upstreamRes.body) {
+    throw new Error('Upstream document fetch returned no body')
   }
   mark('upstream headers received')
 

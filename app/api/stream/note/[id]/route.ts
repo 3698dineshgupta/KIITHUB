@@ -6,6 +6,10 @@ import { buildPdfResponse } from '@/lib/pdf-stream'
 
 const devTiming = process.env.NODE_ENV !== 'production'
 
+// Streaming a large PDF from Telegram/Supabase can take longer than the
+// platform's default function timeout.
+export const maxDuration = 60
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -41,6 +45,7 @@ export async function GET(
       telegramFileId: note.telegramFileId,
       telegramMsgId: note.telegramMsgId,
       title: note.title,
+      fileSize: note.fileSize,
     })
     if (devTiming) console.log(`[stream/note] response ready +${(performance.now() - t0).toFixed(0)}ms`)
     return response
