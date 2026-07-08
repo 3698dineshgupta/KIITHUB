@@ -37,16 +37,25 @@ const nextConfig: NextConfig = {
     //   fonts.googleapis.com request ever happens at runtime.
     // - worker: react-pdf's worker is fetched from unpkg.com (see
     //   components/pdf/pdf-viewer.tsx for why it can't be self-hosted).
+    //   pdf.js's own loader (pdfjs-dist's PDFWorker._initialize) detects that
+    //   URL is cross-origin and does NOT construct the Worker from it
+    //   directly — it wraps it: `new Worker(blob:...)` running
+    //   `await import("https://unpkg.com/...")`. That means TWO directives
+    //   need the CDN, not one: worker-src needs `blob:` (the wrapper itself)
+    //   and script-src needs unpkg.com (the dynamic import happening inside
+    //   that worker). Missing either breaks every PDF in production with a
+    //   "Secure Stream Failure" — confirmed by reading pdfjs-dist's actual
+    //   worker-construction code, not guessed.
     // - connect: every fetch() in this app is same-origin.
     const isDev = process.env.NODE_ENV === 'development'
     const csp = [
       `default-src 'self'`,
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
+      `script-src 'self' 'unsafe-inline' https://unpkg.com${isDev ? " 'unsafe-eval'" : ''}`,
       `style-src 'self' 'unsafe-inline'`,
       `img-src 'self' blob: data: https:`,
       `font-src 'self'`,
       `connect-src 'self'${isDev ? ' ws:' : ''}`,
-      `worker-src 'self' https://unpkg.com`,
+      `worker-src 'self' blob: https://unpkg.com`,
       `frame-ancestors 'self'`,
       `base-uri 'self'`,
       `form-action 'self'`,
