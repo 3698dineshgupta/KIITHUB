@@ -1,6 +1,10 @@
 import { RegisterForm } from '@/components/auth/register-form'
 import { Metadata } from 'next'
-export const metadata: Metadata = { title: 'Sign Up' }
+export const metadata: Metadata = {
+  title: 'Sign Up',
+  description: 'Create your free KIIT Hub account to access notes, PYQs, and more.',
+  robots: { index: false, follow: true },
+}
 export default function RegisterPage() {
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-10">

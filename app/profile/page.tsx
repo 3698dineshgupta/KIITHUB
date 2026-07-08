@@ -4,7 +4,10 @@ import { prisma } from '@/lib/prisma'
 import { ProfileForm } from '@/components/profile/profile-form'
 import { Metadata } from 'next'
 
-export const metadata: Metadata = { title: 'Profile Settings' }
+export const metadata: Metadata = {
+  title: 'Profile Settings',
+  robots: { index: false, follow: false },
+}
 
 export default async function ProfilePage() {
   const session = await auth()

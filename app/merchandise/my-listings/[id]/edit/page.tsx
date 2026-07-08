@@ -4,7 +4,10 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { SellForm } from '@/components/merchandise/sell-form'
 
-export const metadata: Metadata = { title: 'Edit Listing' }
+export const metadata: Metadata = {
+  title: 'Edit Listing',
+  robots: { index: false, follow: false },
+}
 export const dynamic = 'force-dynamic'
 
 export default async function EditListingPage({ params }: { params: Promise<{ id: string }> }) {

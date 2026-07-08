@@ -3,7 +3,10 @@ import { Metadata } from 'next'
 import { auth } from '@/lib/auth'
 import { SellForm } from '@/components/merchandise/sell-form'
 
-export const metadata: Metadata = { title: 'Sell an Item' }
+export const metadata: Metadata = {
+  title: 'Sell an Item',
+  robots: { index: false, follow: false },
+}
 
 export default async function SellPage() {
   const session = await auth()

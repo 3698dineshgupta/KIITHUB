@@ -1,8 +1,9 @@
 import { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy | KIIT Hub',
+  title: 'Privacy Policy',
   description: 'Privacy Policy and Data Handling for KIIT Hub.',
+  alternates: { canonical: '/privacy' },
 }
 
 export default function PrivacyPolicy() {

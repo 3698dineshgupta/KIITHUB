@@ -4,7 +4,22 @@ import { prisma } from '@/lib/prisma'
 import { NotesFilters } from '@/components/notes/notes-filters'
 import { PYQList } from '@/components/notes/pyq-list'
 import { Skeleton } from '@/components/ui/skeleton'
-export const metadata: Metadata = { title: 'Previous Year Questions', description: 'Browse all PYQs organized by year, semester and subject.' }
+export const metadata: Metadata = {
+  title: 'Previous Year Questions',
+  description: 'Browse all PYQs organized by year, semester and subject.',
+  alternates: { canonical: '/pyq' },
+  openGraph: {
+    title: 'Previous Year Questions | KIIT Hub',
+    description: 'Browse all PYQs organized by year, semester and subject.',
+    url: '/pyq',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Previous Year Questions | KIIT Hub',
+    description: 'Browse all PYQs organized by year, semester and subject.',
+  },
+}
 export const dynamic = "force-dynamic";
 export default async function PYQPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const resolvedSearchParams = await searchParams

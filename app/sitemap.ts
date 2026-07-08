@@ -2,7 +2,7 @@ import { MetadataRoute } from 'next';
 import { prisma } from '@/lib/prisma';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://kiithub.com').replace(/\/+$/, '');
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.kiithub.in.net').replace(/\/+$/, '');
 
   // Fetch dynamic routes
   const notes = await prisma.note.findMany({
@@ -12,6 +12,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const pyqs = await prisma.pYQ.findMany({
     where: { isPublished: true },
+    select: { slug: true, updatedAt: true },
+  });
+
+  const listings = await prisma.merchListing.findMany({
+    where: { status: 'APPROVED' },
     select: { slug: true, updatedAt: true },
   });
 
@@ -27,6 +32,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: pyq.updatedAt,
     changeFrequency: 'weekly',
     priority: 0.8,
+  }));
+
+  const listingUrls: MetadataRoute.Sitemap = listings.map((listing) => ({
+    url: `${baseUrl}/merchandise/${listing.slug}`,
+    lastModified: listing.updatedAt,
+    changeFrequency: 'weekly',
+    priority: 0.6,
   }));
 
   // Define static routes
@@ -62,6 +74,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     },
     {
+      url: `${baseUrl}/merchandise`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.8,
+    },
+    {
       url: `${baseUrl}/privacy`,
       lastModified: new Date(),
       changeFrequency: 'yearly',
@@ -75,5 +93,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  return [...staticRoutes, ...noteUrls, ...pyqUrls];
+  return [...staticRoutes, ...noteUrls, ...pyqUrls, ...listingUrls];
 }

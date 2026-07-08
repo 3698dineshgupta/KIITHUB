@@ -8,7 +8,22 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export const dynamic = 'force-dynamic'
-export const metadata: Metadata = { title: 'Merchandise Marketplace', description: 'Buy and sell items with fellow KIIT students.' }
+export const metadata: Metadata = {
+  title: 'Merchandise Marketplace',
+  description: 'Buy and sell items with fellow KIIT students.',
+  alternates: { canonical: '/merchandise' },
+  openGraph: {
+    title: 'Merchandise Marketplace | KIIT Hub',
+    description: 'Buy and sell items with fellow KIIT students.',
+    url: '/merchandise',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Merchandise Marketplace | KIIT Hub',
+    description: 'Buy and sell items with fellow KIIT students.',
+  },
+}
 
 export default async function MerchandisePage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const resolvedSearchParams = await searchParams

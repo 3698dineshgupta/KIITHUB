@@ -9,12 +9,31 @@ import { WhatsAppButton } from '@/components/merchandise/whatsapp-button'
 import { SaveButton } from '@/components/merchandise/save-button'
 import { Badge } from '@/components/ui/badge'
 import { CATEGORY_LABELS, CONDITION_LABELS } from '@/components/merchandise/merch-constants'
+import { JsonLd, SITE_URL, breadcrumbJsonLd } from '@/components/seo/json-ld'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
-  const listing = await prisma.merchListing.findUnique({ where: { slug } })
-  if (!listing) return { title: 'Not Found' }
-  return { title: listing.title, description: listing.description.slice(0, 150) }
+  const listing = await prisma.merchListing.findUnique({ where: { slug }, include: { images: { orderBy: { order: 'asc' }, take: 1 } } })
+  if (!listing || listing.status !== 'APPROVED') return { title: 'Not Found', description: 'This listing could not be found.', robots: { index: false, follow: false } }
+  const description = listing.description.slice(0, 150)
+  return {
+    title: listing.title,
+    description,
+    alternates: { canonical: `/merchandise/${slug}` },
+    openGraph: {
+      title: listing.title,
+      description,
+      url: `/merchandise/${slug}`,
+      type: 'website',
+      images: listing.images[0] ? [{ url: listing.images[0].url }] : undefined,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: listing.title,
+      description,
+      images: listing.images[0] ? [listing.images[0].url] : undefined,
+    },
+  }
 }
 
 export const dynamic = 'force-dynamic'
@@ -33,6 +52,28 @@ export default async function ListingPage({ params }: { params: Promise<{ slug: 
 
   if (!listing || listing.status !== 'APPROVED') notFound()
 
+  const breadcrumb = breadcrumbJsonLd([
+    { name: 'Home', url: SITE_URL },
+    { name: 'Merchandise', url: `${SITE_URL}/merchandise` },
+    { name: listing.title, url: `${SITE_URL}/merchandise/${slug}` },
+  ])
+  const productJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: listing.title,
+    description: listing.description,
+    image: listing.images.map(img => img.url),
+    category: CATEGORY_LABELS[listing.category],
+    itemCondition: listing.condition === 'NEW' ? 'https://schema.org/NewCondition' : 'https://schema.org/UsedCondition',
+    offers: {
+      '@type': 'Offer',
+      price: listing.price,
+      priceCurrency: 'INR',
+      availability: 'https://schema.org/InStock',
+      url: `${SITE_URL}/merchandise/${slug}`,
+    },
+  }
+
   let isSaved = false
   if (session?.user?.id) {
     const save = await prisma.merchSave.findUnique({
@@ -44,6 +85,8 @@ export default async function ListingPage({ params }: { params: Promise<{ slug: 
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <JsonLd data={breadcrumb} />
+      <JsonLd data={productJsonLd} />
       <div className="grid md:grid-cols-2 gap-8">
         <ProductGallery images={listing.images} title={listing.title} />
 

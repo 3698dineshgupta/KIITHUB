@@ -1,8 +1,9 @@
 import { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Terms of Service | KIIT Hub',
+  title: 'Terms of Service',
   description: 'Terms of Service and usage rules for KIIT Hub.',
+  alternates: { canonical: '/terms' },
 }
 
 export default function TermsOfService() {

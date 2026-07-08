@@ -5,7 +5,10 @@ import { prisma } from '@/lib/prisma'
 import { MyListingsList } from '@/components/merchandise/my-listings-list'
 
 export const dynamic = 'force-dynamic'
-export const metadata: Metadata = { title: 'My Listings' }
+export const metadata: Metadata = {
+  title: 'My Listings',
+  robots: { index: false, follow: false },
+}
 
 export default async function MyListingsPage() {
   const session = await auth()

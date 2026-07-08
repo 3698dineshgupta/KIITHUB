@@ -1,4 +1,4 @@
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
@@ -9,12 +9,20 @@ import { PDFViewer } from '@/components/pdf/pdf-viewer'
 import { PremiumGate } from '@/components/pdf/premium-gate'
 import { NoteMetaCard } from '@/components/notes/note-meta-card'
 import { cache, CACHE_KEYS } from '@/lib/redis'
+import { JsonLd, SITE_URL, breadcrumbJsonLd } from '@/components/seo/json-ld'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
   const note = await prisma.note.findUnique({ where: { slug }, include: { subject: true } })
-  if (!note) return { title: 'Not Found' }
-  return { title: note.title, description: note.description ?? `${note.subject.name} notes` }
+  if (!note) return { title: 'Not Found', description: 'This note could not be found.', robots: { index: false, follow: false } }
+  const description = note.description ?? `${note.subject.name} notes`
+  return {
+    title: note.title,
+    description,
+    alternates: { canonical: `/notes/${slug}` },
+    openGraph: { title: note.title, description, url: `/notes/${slug}`, type: 'article' },
+    twitter: { card: 'summary_large_image', title: note.title, description },
+  }
 }
 
 export const dynamic = "force-dynamic";
@@ -27,6 +35,23 @@ export default async function NoteViewPage({ params }: { params: Promise<{ slug:
   })
   if (!note || !note.isPublished) notFound()
 
+  const breadcrumb = breadcrumbJsonLd([
+    { name: 'Home', url: SITE_URL },
+    { name: 'Notes', url: `${SITE_URL}/notes` },
+    { name: note.title, url: `${SITE_URL}/notes/${slug}` },
+  ])
+  const creativeWork = {
+    '@context': 'https://schema.org',
+    '@type': 'CreativeWork',
+    name: note.title,
+    description: note.description ?? `${note.subject.name} notes`,
+    datePublished: note.createdAt.toISOString(),
+    dateModified: note.updatedAt.toISOString(),
+    isAccessibleForFree: !note.isPremium,
+    educationalLevel: 'University',
+    about: note.subject.name,
+  }
+
   const user = session?.user?.id
     ? await prisma.user.findUnique({ where: { id: session.user.id } }).catch(() => null)
     : null
@@ -36,6 +61,8 @@ export default async function NoteViewPage({ params }: { params: Promise<{ slug:
   if (note.isPremium && !userIsPremium) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-8">
+        <JsonLd data={breadcrumb} />
+        <JsonLd data={creativeWork} />
         <NoteMetaCard note={note} />
         <PremiumGate />
       </div>
@@ -61,6 +88,8 @@ export default async function NoteViewPage({ params }: { params: Promise<{ slug:
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+      <JsonLd data={breadcrumb} />
+      <JsonLd data={creativeWork} />
       <NoteMetaCard note={note} />
       {streamToken ? (
         <PDFViewer

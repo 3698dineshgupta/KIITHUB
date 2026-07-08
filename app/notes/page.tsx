@@ -6,7 +6,22 @@ import { NotesList } from '@/components/notes/notes-list'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: 'Notes & Study Materials', description: 'Browse all notes, lab manuals, assignments and study materials.' }
+export const metadata: Metadata = {
+  title: 'Notes & Study Materials',
+  description: 'Browse all notes, lab manuals, assignments and study materials.',
+  alternates: { canonical: '/notes' },
+  openGraph: {
+    title: 'Notes & Study Materials | KIIT Hub',
+    description: 'Browse all notes, lab manuals, assignments and study materials.',
+    url: '/notes',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Notes & Study Materials | KIIT Hub',
+    description: 'Browse all notes, lab manuals, assignments and study materials.',
+  },
+}
 
 export default async function NotesPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const resolvedSearchParams = await searchParams
