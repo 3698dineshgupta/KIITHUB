@@ -18,7 +18,12 @@ import { DocumentNavArrows } from '@/components/pdf/document-nav-arrows'
 // reliable way to self-host react-pdf's exact worker file — the worker MUST
 // be fetched using `pdfjs.version` (read from react-pdf's own bundled copy)
 // so it always matches, regardless of what's installed at the top level.
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+// Explicitly `https:`, not protocol-relative `//unpkg.com/...` — on local
+// dev the page itself is served over http://localhost, so a protocol-
+// relative URL resolves to http://unpkg.com, which doesn't match the
+// `https://unpkg.com` CSP source in next.config.ts and silently fails the
+// worker's dynamic import. https: works identically in dev and production.
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
 interface PDFViewerNavProps {
   canPrev: boolean

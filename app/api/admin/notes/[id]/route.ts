@@ -35,8 +35,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       let dbSemester = await prisma.semester.findUnique({ where: { number: semNum } })
       if (!dbSemester) dbSemester = await prisma.semester.create({ data: { number: semNum, label: `Semester ${semNum}` } })
 
-      let dbSubject = await prisma.subject.findFirst({ where: { name: body.subjectName, branchId: dbBranch.id, semesterId: dbSemester.id } })
-      if (!dbSubject) dbSubject = await prisma.subject.create({ data: { name: body.subjectName, branchId: dbBranch.id, semesterId: dbSemester.id } })
+      // Case-insensitive + trimmed — see app/api/upload/route.ts for why.
+      const subjectName = String(body.subjectName).trim()
+      let dbSubject = await prisma.subject.findFirst({ where: { name: { equals: subjectName, mode: 'insensitive' }, branchId: dbBranch.id, semesterId: dbSemester.id } })
+      if (!dbSubject) dbSubject = await prisma.subject.create({ data: { name: subjectName, branchId: dbBranch.id, semesterId: dbSemester.id } })
 
       data.subjectId = dbSubject.id
       data.branchId = dbBranch.id

@@ -57,8 +57,16 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
       (!branchId || s.branchId === branchId) &&
       (!semesterId || s.semesterId === semesterId)
     )
-    // Deduplicate subjects by name (same subject can exist under multiple branches)
-    return filtered.filter((s, i, arr) => arr.findIndex(x => x.name === s.name) === i)
+    // Dedupe by name, case/whitespace-insensitively — the same subject can
+    // legitimately exist under multiple branches, but inconsistently-typed
+    // duplicates (e.g. "Physics" vs "physics") shouldn't show as two options.
+    const seen = new Set<string>()
+    return filtered.filter(s => {
+      const key = s.name.trim().toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
   }, [subjects, branchId, semesterId])
 
   // Branch/semester changes can invalidate the current subject selection —

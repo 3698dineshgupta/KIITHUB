@@ -88,9 +88,14 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // Case-insensitive + trimmed: an exact match here let differently-cased
+    // or trailing-whitespace spellings of the same subject (e.g. "Physics"
+    // vs "physics") silently create near-duplicate rows on every upload
+    // that didn't type the name identically to a prior one.
+    const subjectName = meta.subjectName.trim()
     let dbSubject = await prisma.subject.findFirst({
       where: {
-        name: meta.subjectName,
+        name: { equals: subjectName, mode: 'insensitive' },
         branchId: dbBranch.id,
         semesterId: dbSemester.id,
       },
@@ -98,7 +103,7 @@ export async function POST(req: NextRequest) {
     if (!dbSubject) {
       dbSubject = await prisma.subject.create({
         data: {
-          name: meta.subjectName,
+          name: subjectName,
           branchId: dbBranch.id,
           semesterId: dbSemester.id,
         },
