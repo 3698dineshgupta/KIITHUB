@@ -15,6 +15,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "upload:local": "node scripts/local-upload-server.mjs",
+    "validate:sitemap": "node scripts/validate-sitemap.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -61,6 +62,7 @@
     "busboy": "^1.6.0",
     "eslint": "^8.57.0",
     "eslint-config-next": "15.0.0",
+    "fast-xml-parser": "^5.10.1",
     "postcss": "^8.5.15",
     "prisma": "^5.22.0",
     "tailwindcss": "^3.4.19",
