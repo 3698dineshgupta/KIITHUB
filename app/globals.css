@@ -77,3 +77,14 @@
 .animate-fade-up-delay-1 { animation-delay: 0.1s; }
 .animate-fade-up-delay-2 { animation-delay: 0.2s; }
 .animate-fade-up-delay-3 { animation-delay: 0.3s; }
+
+/* Grade report printing (components/calculator/grade-report.tsx): the
+   printable markup lives in the DOM at all times (display:none on screen)
+   and everything else is hidden via visibility rather than display so the
+   layout engine doesn't have to reflow the whole page mid-print. */
+@media print {
+  body * { visibility: hidden; }
+  #grade-report-printable, #grade-report-printable * { visibility: visible; }
+  #grade-report-printable { display: block !important; position: absolute; left: 0; top: 0; width: 100%; }
+  .no-print { display: none !important; }
+}

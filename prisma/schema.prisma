@@ -220,6 +220,11 @@ model Subject {
   name        String
   code        String?
   description String?
+  // Nullable: most existing catalog rows predate this field and were never
+  // assigned an official credit value. The SGPA calculator pre-fills from
+  // this when set and otherwise falls back to a clearly-editable default —
+  // it never presents a guessed number as authoritative.
+  credits     Int?
   branchId    String
   semesterId  String
   createdAt   DateTime @default(now())

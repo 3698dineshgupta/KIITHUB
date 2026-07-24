@@ -1,17 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Trash2, Calculator, RotateCcw } from 'lucide-react'
+import { Plus, Trash2, Calculator, RotateCcw, Sparkles, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { GRADE_POINTS, calculateSGPA, calculateCGPA, type SGPASubject } from '@/types'
 import { cn } from '@/lib/utils'
+import { GradeReport } from '@/components/calculator/grade-report'
+import { getCurriculumSemester } from '@/lib/curriculum'
 
-const emptySubject = (): SGPASubject => ({ name: '', credits: 3, grade: 'O' })
+// Grade starts unset (not defaulted to a real grade) — the whole point of
+// auto-populating from the catalog is that the student still has to
+// deliberately pick every grade; defaulting to e.g. 'O' would silently
+// count ungraded subjects as a perfect score.
+const emptySubject = (): SGPASubject => ({ name: '', credits: 3, grade: '' })
 
 function GradeSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
@@ -38,29 +45,110 @@ function GradeSelector({ value, onChange }: { value: string; onChange: (v: strin
   )
 }
 
-function SGPACalculator() {
-  const [subjects, setSubjects] = useState<SGPASubject[]>([emptySubject(), emptySubject(), emptySubject()])
-  const sgpa = calculateSGPA(subjects.filter(s => s.credits > 0))
+interface BranchOpt { id: string; name: string; shortName: string }
+interface SemesterOpt { id: string; number: number; label: string }
+interface CatalogSubject { id: string; name: string; credits: number | null; branchId: string; semesterId: string }
+
+interface SGPACalculatorProps {
+  branches: BranchOpt[]
+  semesters: SemesterOpt[]
+  subjects: CatalogSubject[]
+}
+
+function SGPACalculator({ branches, semesters, subjects }: SGPACalculatorProps) {
+  const [rows, setRows] = useState<SGPASubject[]>([emptySubject(), emptySubject(), emptySubject()])
+  const [branchId, setBranchId] = useState('')
+  const [semesterId, setSemesterId] = useState('')
+  const [showReport, setShowReport] = useState(false)
+
+  const gradedRows = rows.filter(s => s.credits > 0 && s.grade)
+  const sgpa = calculateSGPA(gradedRows)
+  const gradeMap = Object.fromEntries(GRADE_POINTS.map(g => [g.grade, g.points]))
+  const totalCredits = gradedRows.reduce((a, s) => a + s.credits, 0)
+
+  const selectedBranch = branches.find(b => b.id === branchId)
+  const selectedSemester = semesters.find(s => s.id === semesterId)
+
+  // Official curriculum credits (verified against KIIT's published per-
+  // semester totals) take priority when available for the selected
+  // branch+semester — they're precise, unlike the general Notes/PYQ
+  // catalog which mixes named electives with unset credit values.
+  const curriculumSemester = selectedBranch && selectedSemester
+    ? getCurriculumSemester(selectedBranch.shortName, selectedSemester.number)
+    : null
+
+  // Catalog subjects for the selected branch+semester — deduped case/
+  // whitespace-insensitively, same logic as the Notes filter dropdown.
+  const catalogSubjects = useMemo(() => {
+    if (curriculumSemester) {
+      return curriculumSemester.subjects.map(s => ({
+        id: s.name, name: s.name, credits: s.credits, branchId, semesterId,
+      }))
+    }
+    const filtered = subjects.filter(s =>
+      (!branchId || s.branchId === branchId) &&
+      (!semesterId || s.semesterId === semesterId)
+    )
+    const seen = new Set<string>()
+    return filtered.filter(s => {
+      const key = s.name.trim().toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }, [subjects, branchId, semesterId, curriculumSemester])
+
+  const loadSubjects = () => {
+    if (catalogSubjects.length === 0) return
+    setRows(catalogSubjects.map(s => ({ name: s.name, credits: s.credits ?? 3, grade: '' })))
+  }
 
   const update = (i: number, field: keyof SGPASubject, value: string | number) => {
-    setSubjects(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: value } : s))
+    setRows(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: value } : s))
   }
-  const add = () => setSubjects(prev => [...prev, emptySubject()])
-  const remove = (i: number) => setSubjects(prev => prev.filter((_, idx) => idx !== i))
-  const reset = () => setSubjects([emptySubject(), emptySubject(), emptySubject()])
-
-  const gradeMap = Object.fromEntries(GRADE_POINTS.map(g => [g.grade, g.points]))
-  const totalCredits = subjects.filter(s => s.credits > 0).reduce((a, s) => a + s.credits, 0)
+  const add = () => setRows(prev => [...prev, emptySubject()])
+  const remove = (i: number) => setRows(prev => prev.filter((_, idx) => idx !== i))
+  const reset = () => { setRows([emptySubject(), emptySubject(), emptySubject()]); setBranchId(''); setSemesterId('') }
 
   return (
     <div className="space-y-6">
+      {/* Auto-fill from curriculum */}
+      <Card className="p-4">
+        <div className="flex items-center gap-2 mb-3 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" />Auto-fill subjects for your semester</div>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Select value={branchId} onValueChange={setBranchId}>
+            <SelectTrigger className="sm:w-40"><SelectValue placeholder="Branch" /></SelectTrigger>
+            <SelectContent>{branches.map(b => <SelectItem key={b.id} value={b.id}>{b.shortName}</SelectItem>)}</SelectContent>
+          </Select>
+          <Select value={semesterId} onValueChange={setSemesterId}>
+            <SelectTrigger className="sm:w-40"><SelectValue placeholder="Semester" /></SelectTrigger>
+            <SelectContent>{semesters.map(s => <SelectItem key={s.id} value={s.id}>Sem {s.number}</SelectItem>)}</SelectContent>
+          </Select>
+          <Button type="button" variant="outline" onClick={loadSubjects} disabled={!branchId || !semesterId || catalogSubjects.length === 0} className="gap-2 sm:ml-auto">
+            <Sparkles className="h-4 w-4" />Load {catalogSubjects.length > 0 ? `${catalogSubjects.length} Subjects` : 'Subjects'}
+          </Button>
+        </div>
+        {branchId && semesterId && catalogSubjects.length === 0 && (
+          <p className="text-xs text-muted-foreground mt-2">No subjects found in our catalog for this branch/semester yet — add them manually below.</p>
+        )}
+        {curriculumSemester && (
+          <div className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
+            <Badge variant="premium" className="text-[10px] px-1.5 py-0">Official</Badge>
+            Credits match KIIT&apos;s published curriculum ({curriculumSemester.totalCredits} total credits this semester).
+          </div>
+        )}
+        {!curriculumSemester && catalogSubjects.length > 0 && (
+          <p className="text-xs text-muted-foreground mt-2">Credits are pre-filled where known and always editable — double-check them against your official curriculum.</p>
+        )}
+      </Card>
+
       {/* Result */}
       <Card className={cn('border-2 text-center p-8', sgpa >= 8 ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30' : sgpa >= 6 ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30' : 'border-border')}>
         <div className={cn('text-6xl font-black mb-2 tabular-nums', sgpa >= 8 ? 'text-emerald-600' : sgpa >= 6 ? 'text-amber-600' : sgpa > 0 ? 'text-orange-600' : 'text-muted-foreground')}>
           {sgpa > 0 ? sgpa.toFixed(2) : '—'}
         </div>
         <div className="text-xl font-semibold mb-1">SGPA</div>
-        <div className="text-sm text-muted-foreground">{totalCredits} total credits · {subjects.filter(s => s.credits > 0).length} subjects</div>
+        <div className="text-sm text-muted-foreground">{totalCredits} credits counted · {gradedRows.length}/{rows.length} subjects graded</div>
         {sgpa >= 9 && <Badge className="mt-3 bg-emerald-600">Outstanding!</Badge>}
         {sgpa >= 8 && sgpa < 9 && <Badge className="mt-3 bg-blue-600">Excellent</Badge>}
         {sgpa >= 7 && sgpa < 8 && <Badge className="mt-3 bg-amber-600">Good</Badge>}
@@ -71,7 +159,7 @@ function SGPACalculator() {
       {/* Subjects */}
       <div className="space-y-3">
         <AnimatePresence>
-          {subjects.map((sub, i) => (
+          {rows.map((sub, i) => (
             <motion.div
               key={i}
               initial={{ opacity: 0, y: 10 }}
@@ -105,13 +193,16 @@ function SGPACalculator() {
                       <GradeSelector value={sub.grade} onChange={v => update(i, 'grade', v)} />
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground">
-                          Points: <strong>{gradeMap[sub.grade] ?? 0}</strong>
-                          <> · Weighted: <strong>{((gradeMap[sub.grade] ?? 0) * sub.credits).toFixed(0)}</strong></>
+                          {sub.grade ? (
+                            <>Points: <strong>{gradeMap[sub.grade] ?? 0}</strong> · Weighted: <strong>{((gradeMap[sub.grade] ?? 0) * sub.credits).toFixed(0)}</strong></>
+                          ) : (
+                            <span className="italic">Choose a grade</span>
+                          )}
                         </span>
                       </div>
                     </div>
                   </div>
-                  {subjects.length > 1 && (
+                  {rows.length > 1 && (
                     <button onClick={() => remove(i)} className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors mt-1">
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -123,10 +214,29 @@ function SGPACalculator() {
         </AnimatePresence>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         <Button variant="outline" onClick={add} className="gap-2"><Plus className="h-4 w-4" />Add Subject</Button>
         <Button variant="ghost" onClick={reset} className="gap-2"><RotateCcw className="h-4 w-4" />Reset</Button>
+        <Button
+          variant="premium"
+          onClick={() => setShowReport(true)}
+          disabled={gradedRows.length === 0}
+          className="gap-2 ml-auto"
+        >
+          <FileText className="h-4 w-4" />Generate Grade Report
+        </Button>
       </div>
+
+      {showReport && (
+        <GradeReport
+          subjects={gradedRows}
+          sgpa={sgpa}
+          totalCredits={totalCredits}
+          defaultBranch={selectedBranch?.shortName ?? ''}
+          defaultSemester={selectedSemester ? `Semester ${selectedSemester.number}` : ''}
+          onClose={() => setShowReport(false)}
+        />
+      )}
     </div>
   )
 }
@@ -199,7 +309,13 @@ function CGPACalculator() {
   )
 }
 
-export function CalculatorContent() {
+interface CalculatorContentProps {
+  branches: BranchOpt[]
+  semesters: SemesterOpt[]
+  subjects: CatalogSubject[]
+}
+
+export function CalculatorContent({ branches, semesters, subjects }: CalculatorContentProps) {
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
       <div className="text-center mb-10">
@@ -215,7 +331,7 @@ export function CalculatorContent() {
           <TabsTrigger value="sgpa" className="flex-1">SGPA (per semester)</TabsTrigger>
           <TabsTrigger value="cgpa" className="flex-1">CGPA (overall)</TabsTrigger>
         </TabsList>
-        <TabsContent value="sgpa"><SGPACalculator /></TabsContent>
+        <TabsContent value="sgpa"><SGPACalculator branches={branches} semesters={semesters} subjects={subjects} /></TabsContent>
         <TabsContent value="cgpa"><CGPACalculator /></TabsContent>
       </Tabs>
 
