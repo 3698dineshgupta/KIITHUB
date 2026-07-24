@@ -1,11 +1,13 @@
 import Link from 'next/link'
 import { BookOpen, Github, Twitter, Mail } from 'lucide-react'
 import { ReportBugTrigger } from '@/components/bugs/report-bug-trigger'
+import { ReferralBanner } from '@/components/layout/referral-banner'
 
 export function Footer() {
   return (
     <footer className="border-t bg-background/95 mt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <ReferralBanner />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="flex items-center gap-2 font-bold text-lg mb-3">
