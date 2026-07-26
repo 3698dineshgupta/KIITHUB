@@ -49,9 +49,41 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail, 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [fullscreen, setFullscreen] = useState(false)
-  const [zoom, setZoom] = useState(1.0) // 100%
+  const [zoom, setZoom] = useState(1.0) // 100% = fits the page container's width exactly
   const containerRef = useRef<HTMLDivElement>(null)
+  const pagesContainerRef = useRef<HTMLDivElement>(null)
   const hasClosedLoaderRef = useRef(false)
+
+  // Pages used to render at a raw pdf.js `scale` (1.0 ≈ the PDF's native
+  // point size), completely unrelated to how wide the on-screen container
+  // actually was. On phones that meant even "60%" was still wider than the
+  // viewport, so every line ran off the edge and reading required
+  // horizontal scrolling per line. Measuring the container and rendering at
+  // `width={fitWidth} scale={zoom}` makes 100% mean "fits the screen" on
+  // every device, and zoom becomes a multiplier on top of that baseline.
+  const [fitWidth, setFitWidth] = useState(500)
+  useEffect(() => {
+    const el = pagesContainerRef.current
+    if (!el) return
+    const measure = () => {
+      const horizontalPadding = window.innerWidth < 640 ? 32 : 48
+      setFitWidth(Math.max(240, el.clientWidth - horizontalPadding))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [fullscreen])
+
+  // Rasterizing a canvas at the phone's full devicePixelRatio (often 3 on
+  // mid-range Android hardware) means 9x the pixels of a dpr-1 render —
+  // heavy enough on a mobile CPU that switching documents (which mounts a
+  // fresh canvas while the previous one is still in the DOM) visibly froze
+  // the tab. Capping at 2 keeps text crisp while cutting that cost sharply.
+  const [renderDpr, setRenderDpr] = useState(1)
+  useEffect(() => {
+    setRenderDpr(Math.min(window.devicePixelRatio || 1, 2))
+  }, [])
 
   // Runs on mount AND every time the caller swaps `streamUrl` to switch to a
   // different document in-place (Suggested Materials / Prev-Next) — the
@@ -179,7 +211,7 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail, 
       </div>
 
       {/* Pages Container */}
-      <div className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-6 bg-zinc-900/40 flex flex-col items-center gap-6 relative" style={{ maxHeight: fullscreen ? 'calc(100vh - 48px)' : 650 }}>
+      <div ref={pagesContainerRef} className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-6 bg-zinc-900/40 flex flex-col items-center gap-6 relative" style={{ maxHeight: fullscreen ? 'calc(100vh - 48px)' : 650 }}>
         {loading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950/70 z-20 gap-3 text-white">
             <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
@@ -212,6 +244,8 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail, 
                 key={`${streamUrl}-${pageNum}`}
                 pageNumber={pageNum}
                 zoom={zoom}
+                fitWidth={fitWidth}
+                renderDpr={renderDpr}
                 userEmail={userEmail}
                 onRenderSuccess={pageNum === 1 ? closeDocumentLoader : undefined}
               />
@@ -231,6 +265,8 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail, 
 interface LazyPageSlotProps {
   pageNumber: number
   zoom: number
+  fitWidth: number
+  renderDpr: number
   userEmail?: string
   onRenderSuccess?: () => void
 }
@@ -238,9 +274,11 @@ interface LazyPageSlotProps {
 // Only the first two pages mount immediately (page 1 must render to close the
 // full-screen loader); the rest wait for an IntersectionObserver hit before
 // mounting <Page>, so a long document doesn't pay to render every canvas at once.
-function LazyPageSlot({ pageNumber, zoom, userEmail, onRenderSuccess }: LazyPageSlotProps) {
+function LazyPageSlot({ pageNumber, zoom, fitWidth, renderDpr, userEmail, onRenderSuccess }: LazyPageSlotProps) {
   const [visible, setVisible] = useState(pageNumber <= 2)
   const slotRef = useRef<HTMLDivElement>(null)
+  const placeholderWidth = Math.round(fitWidth * zoom)
+  const placeholderHeight = Math.round(placeholderWidth * 1.414) // A4-ish fallback aspect ratio
 
   useEffect(() => {
     if (visible) return
@@ -264,18 +302,26 @@ function LazyPageSlot({ pageNumber, zoom, userEmail, onRenderSuccess }: LazyPage
       {visible ? (
         <Page
           pageNumber={pageNumber}
+          width={fitWidth}
           scale={zoom}
+          devicePixelRatio={renderDpr}
           renderTextLayer={false}
           renderAnnotationLayer={false}
           onRenderSuccess={onRenderSuccess}
           loading={
-            <div className="w-[500px] h-[700px] max-w-full bg-zinc-950/20 animate-pulse flex items-center justify-center text-xs text-muted-foreground">
+            <div
+              className="max-w-full bg-zinc-950/20 animate-pulse flex items-center justify-center text-xs text-muted-foreground"
+              style={{ width: placeholderWidth, height: placeholderHeight }}
+            >
               Rendering Page {pageNumber}...
             </div>
           }
         />
       ) : (
-        <div className="w-[500px] h-[700px] max-w-full bg-zinc-950/20 animate-pulse flex items-center justify-center text-xs text-muted-foreground">
+        <div
+          className="max-w-full bg-zinc-950/20 animate-pulse flex items-center justify-center text-xs text-muted-foreground"
+          style={{ width: placeholderWidth, height: placeholderHeight }}
+        >
           Page {pageNumber}
         </div>
       )}

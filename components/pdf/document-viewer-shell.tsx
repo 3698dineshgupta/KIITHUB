@@ -32,7 +32,14 @@ const FRESH_MS = 90 * 60 * 1000
 // CSS, not unmounted) up to this many at a time, so stepping back to one is a
 // plain visibility toggle — no re-fetch, no pdf.js re-parse. Bounded so a long
 // forward-only session doesn't keep every large PDF's canvases in memory.
-const MAX_MOUNTED = 3
+// Phones pay for this pool in main-thread canvas rasterization, not just
+// memory — keeping several full-resolution PDF renders alive at once was
+// enough to make switching documents visibly freeze the tab, so mobile
+// keeps only the current document mounted.
+function getMaxMounted() {
+  if (typeof window === 'undefined') return 3
+  return window.innerWidth < 640 ? 1 : 3
+}
 
 function key(ref: DocRef) {
   return `${ref.type}:${ref.slug}`
@@ -52,6 +59,11 @@ export function DocumentViewerShell({ initial }: DocumentViewerShellProps) {
     { key: key({ type: initial.type, slug: initial.slug }), ref: { type: initial.type, slug: initial.slug }, state: { gated: false, ...initial } },
   ])
 
+  // Keys of documents whose stream URL has already been Range-warmed this
+  // session — prevents re-issuing the same upstream Telegram fetch every
+  // time the reader navigates near a document that was already prefetched.
+  const warmedStreamsRef = useRef<Set<string>>(new Set())
+
   const cacheRef = useRef<Map<string, { state: ViewerState; fetchedAt: number }> | null>(null)
   if (!cacheRef.current) {
     cacheRef.current = new Map()
@@ -68,7 +80,8 @@ export function DocumentViewerShell({ initial }: DocumentViewerShellProps) {
     const k = key(ref)
     setMountedDocs(prev => {
       const next = [...prev.filter(d => d.key !== k), { key: k, ref, state }]
-      return next.length > MAX_MOUNTED ? next.slice(next.length - MAX_MOUNTED) : next
+      const maxMounted = getMaxMounted()
+      return next.length > maxMounted ? next.slice(next.length - maxMounted) : next
     })
   }
 
@@ -204,11 +217,19 @@ export function DocumentViewerShell({ initial }: DocumentViewerShellProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // As soon as a document is on screen, silently warm the previous/next
-  // entries and the top suggestions in the background: fetch their metadata
-  // + a signed stream URL, then a small Range request against that stream so
-  // Telegram's file-URL resolution is already cached by the time the reader
-  // actually clicks through.
+  // As soon as a document is on screen, silently warm the immediate prev/next
+  // entries in the background: fetch their metadata + a signed stream URL,
+  // then a small Range request against that stream so Telegram's file-URL
+  // resolution is already cached by the time the reader actually clicks
+  // through. This used to also warm the top 5 suggestions on every single
+  // navigation (up to 7 parallel metadata fetches + 7 parallel upstream
+  // Range fetches, refired every time you moved to a new document) — that
+  // was saturating both the dev server's single Node process and Telegram's
+  // API, competing directly with the document actually being loaded and
+  // making everything feel slow. Now it only warms the 1-2 most likely next
+  // clicks, waits until the current document has had a moment to load
+  // before starting, and never re-fetches a stream it already warmed this
+  // session.
   useEffect(() => {
     if (current.gated) return
     let cancelled = false
@@ -216,20 +237,24 @@ export function DocumentViewerShell({ initial }: DocumentViewerShellProps) {
     if (historyIndex > 0) targets.push(history[historyIndex - 1])
     if (historyIndex < history.length - 1) targets.push(history[historyIndex + 1])
     else if (current.suggestions[0]) targets.push({ type: current.suggestions[0].type, slug: current.suggestions[0].slug })
-    current.suggestions.slice(0, 5).forEach(s => targets.push({ type: s.type, slug: s.slug }))
 
-    const seen = new Set<string>()
-    for (const ref of targets) {
-      const k = key(ref)
-      if (seen.has(k)) continue
-      seen.add(k)
-      ;(async () => {
-        const state = await fetchDetail(ref)
-        if (cancelled || !state || state.gated) return
-        fetch(state.streamUrl, { headers: { Range: 'bytes=0-131071' } }).catch(() => {})
-      })()
-    }
-    return () => { cancelled = true }
+    const timer = setTimeout(() => {
+      if (cancelled) return
+      const seen = new Set<string>()
+      for (const ref of targets) {
+        const k = key(ref)
+        if (seen.has(k) || warmedStreamsRef.current.has(k)) continue
+        seen.add(k)
+        ;(async () => {
+          const state = await fetchDetail(ref)
+          if (cancelled || !state || state.gated) return
+          warmedStreamsRef.current.add(k)
+          fetch(state.streamUrl, { headers: { Range: 'bytes=0-131071' } }).catch(() => {})
+        })()
+      }
+    }, 1200)
+
+    return () => { cancelled = true; clearTimeout(timer) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current.type, current.slug])
 
