@@ -119,24 +119,24 @@ export function ReportBugDialog() {
             )}
 
             <div>
-              <Label className="mb-1.5 block">Bug Title</Label>
-              <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Short summary of the issue" required maxLength={150} />
+              <Label htmlFor="bug-title" className="mb-1.5 block">Bug Title</Label>
+              <Input id="bug-title" name="title" value={title} onChange={e => setTitle(e.target.value)} placeholder="Short summary of the issue" required maxLength={150} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="mb-1.5 block">Category</Label>
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Label htmlFor="bug-category" className="mb-1.5 block">Category</Label>
+                <Select value={category} onValueChange={setCategory} name="category">
+                  <SelectTrigger id="bug-category"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {BUG_CATEGORIES.map(c => <SelectItem key={c} value={c}>{BUG_CATEGORY_LABELS[c]}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label className="mb-1.5 block">Severity</Label>
-                <Select value={severity} onValueChange={setSeverity}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Label htmlFor="bug-severity" className="mb-1.5 block">Severity</Label>
+                <Select value={severity} onValueChange={setSeverity} name="severity">
+                  <SelectTrigger id="bug-severity"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {BUG_SEVERITIES.map(s => <SelectItem key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</SelectItem>)}
                   </SelectContent>
@@ -145,8 +145,10 @@ export function ReportBugDialog() {
             </div>
 
             <div>
-              <Label className="mb-1.5 block">Description</Label>
+              <Label htmlFor="bug-description" className="mb-1.5 block">Description</Label>
               <textarea
+                id="bug-description"
+                name="description"
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 placeholder="What went wrong?"
@@ -158,36 +160,36 @@ export function ReportBugDialog() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <Label className="mb-1.5 block">Expected Behavior</Label>
-                <textarea value={expected} onChange={e => setExpected(e.target.value)} rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y" />
+                <Label htmlFor="bug-expected" className="mb-1.5 block">Expected Behavior</Label>
+                <textarea id="bug-expected" name="expectedBehavior" value={expected} onChange={e => setExpected(e.target.value)} rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y" />
               </div>
               <div>
-                <Label className="mb-1.5 block">Actual Behavior</Label>
-                <textarea value={actual} onChange={e => setActual(e.target.value)} rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y" />
+                <Label htmlFor="bug-actual" className="mb-1.5 block">Actual Behavior</Label>
+                <textarea id="bug-actual" name="actualBehavior" value={actual} onChange={e => setActual(e.target.value)} rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y" />
               </div>
             </div>
 
             <div>
-              <Label className="mb-1.5 block">Steps to Reproduce</Label>
-              <textarea value={steps} onChange={e => setSteps(e.target.value)} rows={2} placeholder="1. Go to...&#10;2. Click on...&#10;3. See error" className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y" />
+              <Label htmlFor="bug-steps" className="mb-1.5 block">Steps to Reproduce</Label>
+              <textarea id="bug-steps" name="stepsToReproduce" value={steps} onChange={e => setSteps(e.target.value)} rows={2} placeholder="1. Go to...&#10;2. Click on...&#10;3. See error" className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y" />
             </div>
 
             <div>
-              <Label className="mb-1.5 block">Contact Email (optional)</Label>
-              <Input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="you@example.com" />
+              <Label htmlFor="bug-email" className="mb-1.5 block">Contact Email (optional)</Label>
+              <Input id="bug-email" name="contactEmail" type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="you@example.com" />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="inline-flex items-center gap-2 w-full justify-center rounded-md text-sm font-medium border border-input hover:bg-accent h-9 px-3 cursor-pointer">
+                <label htmlFor="bug-screenshot" className="inline-flex items-center gap-2 w-full justify-center rounded-md text-sm font-medium border border-input hover:bg-accent h-9 px-3 cursor-pointer">
                   <Paperclip className="h-3.5 w-3.5" />{screenshot ? screenshot.name.slice(0, 14) : 'Screenshot'}
-                  <input ref={screenshotRef} type="file" accept="image/*" className="hidden" onChange={e => setScreenshot(e.target.files?.[0] ?? null)} />
+                  <input id="bug-screenshot" name="screenshot" ref={screenshotRef} type="file" accept="image/*" className="hidden" onChange={e => setScreenshot(e.target.files?.[0] ?? null)} />
                 </label>
               </div>
               <div>
-                <label className="inline-flex items-center gap-2 w-full justify-center rounded-md text-sm font-medium border border-input hover:bg-accent h-9 px-3 cursor-pointer">
+                <label htmlFor="bug-recording" className="inline-flex items-center gap-2 w-full justify-center rounded-md text-sm font-medium border border-input hover:bg-accent h-9 px-3 cursor-pointer">
                   <Video className="h-3.5 w-3.5" />{recording ? recording.name.slice(0, 14) : 'Recording'}
-                  <input ref={recordingRef} type="file" accept="video/*" className="hidden" onChange={e => setRecording(e.target.files?.[0] ?? null)} />
+                  <input id="bug-recording" name="recording" ref={recordingRef} type="file" accept="video/*" className="hidden" onChange={e => setRecording(e.target.files?.[0] ?? null)} />
                 </label>
               </div>
             </div>

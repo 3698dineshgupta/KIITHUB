@@ -34,7 +34,10 @@ const nextConfig: NextConfig = {
     //   this origin, but a few raw <img> tags (admin QR code URL, local
     //   object-URL previews) load arbitrary https/blob sources directly.
     // - font: next/font self-hosts Google Fonts at build time — no
-    //   fonts.googleapis.com request ever happens at runtime.
+    //   fonts.googleapis.com request ever happens at runtime. `data:` is
+    //   also needed: pdf.js embeds some PDF-internal fonts as base64 data
+    //   URIs when rendering — that's content generated from the document
+    //   itself, not a remote fetch, so allowing it doesn't weaken the policy.
     // - worker: react-pdf's worker is fetched from unpkg.com (see
     //   components/pdf/pdf-viewer.tsx for why it can't be self-hosted).
     //   pdf.js's own loader (pdfjs-dist's PDFWorker._initialize) detects that
@@ -53,7 +56,7 @@ const nextConfig: NextConfig = {
       `script-src 'self' 'unsafe-inline' https://unpkg.com${isDev ? " 'unsafe-eval'" : ''}`,
       `style-src 'self' 'unsafe-inline'`,
       `img-src 'self' blob: data: https:`,
-      `font-src 'self'`,
+      `font-src 'self' data:`,
       `connect-src 'self'${isDev ? ' ws:' : ''}`,
       `worker-src 'self' blob: https://unpkg.com`,
       `frame-ancestors 'self'`,
