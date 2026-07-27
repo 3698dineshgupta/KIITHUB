@@ -71,6 +71,14 @@ type PyqCandidate = {
   semester: { number: number }
 }
 
+// Deliberately excludes view count: it used to be folded straight into the
+// score, so two siblings in the same multi-part series (identical subject/
+// semester/content-type — the maximum-relevance tier) got different totals
+// from view-count differences alone, and popularity silently overrode
+// sequence — "Part 16" (18 views) would outrank "Part 1" (0 views) even
+// though reading order clearly calls for 1 before 16. Popularity now only
+// acts as a late tie-break (see getSuggestions), after relevance and after
+// natural title order, so it can't do that anymore.
 function scoreCandidate(cand: NoteCandidate | PyqCandidate, ctx: SuggestionContext): number {
   let score = 0
   if (cand.subjectId === ctx.subjectId) score += 100
@@ -85,7 +93,6 @@ function scoreCandidate(cand: NoteCandidate | PyqCandidate, ctx: SuggestionConte
     const overlap = cand.tags.filter(t => ctx.tags!.includes(t.tag)).length
     score += overlap * 8
   }
-  score += Math.log10((cand.viewCount || 0) + 1) * 3
   return score
 }
 
@@ -129,9 +136,18 @@ export async function getSuggestions(ctx: SuggestionContext): Promise<Suggestion
     ...pyqs.map(p => ({ kind: 'pyq' as const, ...p })),
   ]
 
+  // Rank by relevance first, then natural (numeric-aware) title order so a
+  // multi-part series like "EPP Note Part 3", "... Part 15" always reads
+  // sequentially — "Part 2" sorts before "Part 15" instead of being treated
+  // as opaque strings. Popularity is only a last-resort tie-break, for the
+  // rare case two titles collide exactly.
   const ranked = candidates
     .map(c => ({ c, score: scoreCandidate(c, ctx) }))
-    .sort((a, b) => b.score - a.score || b.c.viewCount - a.c.viewCount || b.c.createdAt.getTime() - a.c.createdAt.getTime())
+    .sort((a, b) =>
+      b.score - a.score ||
+      a.c.title.localeCompare(b.c.title, undefined, { numeric: true, sensitivity: 'base' }) ||
+      b.c.viewCount - a.c.viewCount
+    )
     .slice(0, SUGGEST_LIMIT)
     .map(({ c }): SuggestionItem => ({
       type: c.kind,

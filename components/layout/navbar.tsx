@@ -49,7 +49,7 @@ export function Navbar() {
             ))}
           </nav>
           <div className="flex items-center gap-2">
-            {mounted && <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="p-2 rounded-lg hover:bg-accent transition-colors">{theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>}
+            {mounted && <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} className="p-2 rounded-lg hover:bg-accent transition-colors">{theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>}
             {status === 'loading' ? <div className="h-8 w-20 bg-muted animate-pulse rounded-lg" /> : session?.user ? (
               <div className="relative">
                 <button onClick={() => setUserMenu(!userMenu)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent transition-colors">
@@ -77,7 +77,7 @@ export function Navbar() {
                 <Link href="/register"><Button size="sm">Sign Up</Button></Link>
               </div>
             )}
-            <button className="md:hidden p-2 rounded-lg hover:bg-accent transition-colors" onClick={() => setMobileOpen(!mobileOpen)}>{mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
+            <button className="md:hidden p-2 rounded-lg hover:bg-accent transition-colors" aria-label={mobileOpen ? 'Close menu' : 'Open menu'} onClick={() => setMobileOpen(!mobileOpen)}>{mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
           </div>
         </div>
       </div>

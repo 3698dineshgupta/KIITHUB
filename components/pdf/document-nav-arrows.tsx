@@ -12,15 +12,19 @@ interface DocumentNavArrowsProps {
   disabled?: boolean
 }
 
+// Left always advances to a new/next material; right always steps back to
+// whatever was previously open — the reverse of a typical carousel, but
+// deliberate: readers move through a stack of new material with the left
+// hand and step back to what they already saw with the right.
 export function DocumentNavArrows({ canPrev, canNext, prevLabel, nextLabel, onPrev, onNext, disabled }: DocumentNavArrowsProps) {
   if (!canPrev && !canNext) return null
   return (
     <>
-      {canPrev && (
+      {canNext && (
         <button
-          onClick={onPrev}
+          onClick={onNext}
           disabled={disabled}
-          title={prevLabel ? `Previous: ${prevLabel}` : 'Previous material'}
+          title={nextLabel ? `Next: ${nextLabel}` : 'Next material'}
           className={cn(
             'absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-30',
             'flex items-center gap-1.5 pl-2 pr-3 py-2 rounded-full',
@@ -31,15 +35,15 @@ export function DocumentNavArrows({ canPrev, canNext, prevLabel, nextLabel, onPr
         >
           <ChevronLeft className="h-4 w-4 flex-shrink-0" />
           <span className="hidden sm:inline text-xs font-medium max-w-[140px] truncate">
-            {prevLabel ?? 'Previous'}
+            {nextLabel ?? 'Next'}
           </span>
         </button>
       )}
-      {canNext && (
+      {canPrev && (
         <button
-          onClick={onNext}
+          onClick={onPrev}
           disabled={disabled}
-          title={nextLabel ? `Next: ${nextLabel}` : 'Next material'}
+          title={prevLabel ? `Previous: ${prevLabel}` : 'Previous material'}
           className={cn(
             'absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-30',
             'flex items-center gap-1.5 pl-3 pr-2 py-2 rounded-full',
@@ -49,7 +53,7 @@ export function DocumentNavArrows({ canPrev, canNext, prevLabel, nextLabel, onPr
           )}
         >
           <span className="hidden sm:inline text-xs font-medium max-w-[140px] truncate">
-            {nextLabel ?? 'Next'}
+            {prevLabel ?? 'Previous'}
           </span>
           <ChevronRight className="h-4 w-4 flex-shrink-0" />
         </button>

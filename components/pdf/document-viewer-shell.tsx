@@ -59,6 +59,9 @@ export function DocumentViewerShell({ initial }: DocumentViewerShellProps) {
     { key: key({ type: initial.type, slug: initial.slug }), ref: { type: initial.type, slug: initial.slug }, state: { gated: false, ...initial } },
   ])
 
+  // Synchronous re-entry guard for goTo — see the comment inside it.
+  const navLockRef = useRef(false)
+
   // Keys of documents whose stream URL has already been Range-warmed this
   // session — prevents re-issuing the same upstream Telegram fetch every
   // time the reader navigates near a document that was already prefetched.
@@ -117,47 +120,62 @@ export function DocumentViewerShell({ initial }: DocumentViewerShellProps) {
   }
 
   async function goTo(ref: DocRef, opts: { pushUrl: boolean }) {
-    const k = key(ref)
+    // The "already mounted" fast path below is synchronous and used to never
+    // set `switching`, so nothing disabled the arrows or blocked a second
+    // click between it firing and React committing the resulting state — an
+    // impatient double-click (more likely when things already feel slow)
+    // re-ran goTo with the same stale closure, firing a second, redundant
+    // /view POST and duplicate fetches that competed with the real one for
+    // the same network/DB resources. navLockRef is a plain ref, so it's
+    // checked and set synchronously, before any state update has a chance
+    // to commit — unlike `switching`, it actually blocks a same-tick re-entry.
+    if (navLockRef.current) return
+    navLockRef.current = true
+    try {
+      const k = key(ref)
 
-    // Already mounted (its PDFViewer instance is alive, just hidden) — this is
-    // the common Prev case and any revisit within the pool: swap `current`
-    // and reorder the pool with zero fetch, zero loader, zero re-parse.
-    const mounted = mountedDocs.find(d => d.key === k)
-    if (mounted) {
+      // Already mounted (its PDFViewer instance is alive, just hidden) — this is
+      // the common Prev case and any revisit within the pool: swap `current`
+      // and reorder the pool with zero fetch, zero loader, zero re-parse.
+      const mounted = mountedDocs.find(d => d.key === k)
+      if (mounted) {
+        setSwitchError(null)
+        setCurrent(mounted.state)
+        touchMounted(ref, mounted.state)
+        if (opts.pushUrl) pushUrlFor(ref)
+        fetch(`/api/document/${ref.type}/${ref.slug}/view`, { method: 'POST', keepalive: true }).catch(() => {})
+        return
+      }
+
+      const cached = cacheRef.current!.get(k)
+      const { openLoader, closeLoader } = useDocumentLoaderStore.getState()
+      const token = openLoader(cached?.state.title ?? 'Document')
+      setSwitching(true)
       setSwitchError(null)
-      setCurrent(mounted.state)
-      touchMounted(ref, mounted.state)
+
+      const state = await fetchDetail(ref)
+      if (!state) {
+        closeLoader(token)
+        setSwitching(false)
+        setSwitchError('Could not open that document. Please try again.')
+        return
+      }
+
+      setCurrent(state)
+      if (state.gated) {
+        // A gated result never mounts PDFViewer, so nothing will fire the
+        // page-1-rendered callback that normally closes the loader.
+        closeLoader(token)
+      } else {
+        touchMounted(ref, state)
+      }
+
       if (opts.pushUrl) pushUrlFor(ref)
       fetch(`/api/document/${ref.type}/${ref.slug}/view`, { method: 'POST', keepalive: true }).catch(() => {})
-      return
-    }
-
-    const cached = cacheRef.current!.get(k)
-    const { openLoader, closeLoader } = useDocumentLoaderStore.getState()
-    const token = openLoader(cached?.state.title ?? 'Document')
-    setSwitching(true)
-    setSwitchError(null)
-
-    const state = await fetchDetail(ref)
-    if (!state) {
-      closeLoader(token)
       setSwitching(false)
-      setSwitchError('Could not open that document. Please try again.')
-      return
+    } finally {
+      navLockRef.current = false
     }
-
-    setCurrent(state)
-    if (state.gated) {
-      // A gated result never mounts PDFViewer, so nothing will fire the
-      // page-1-rendered callback that normally closes the loader.
-      closeLoader(token)
-    } else {
-      touchMounted(ref, state)
-    }
-
-    if (opts.pushUrl) pushUrlFor(ref)
-    fetch(`/api/document/${ref.type}/${ref.slug}/view`, { method: 'POST', keepalive: true }).catch(() => {})
-    setSwitching(false)
   }
 
   function goPrev() {

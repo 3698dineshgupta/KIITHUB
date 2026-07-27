@@ -35,9 +35,9 @@ export function Footer() {
         <div className="mt-8 pt-8 border-t flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} KIIT Hub. Made for students.</p>
           <div className="flex items-center gap-4">
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground"><Github className="h-4 w-4" /></a>
-            <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground"><Twitter className="h-4 w-4" /></a>
-            <a href="mailto:support.kiithub@gmail.com" className="text-muted-foreground hover:text-foreground"><Mail className="h-4 w-4" /></a>
+            <a href="https://github.com" target="_blank" rel="noopener noreferrer" aria-label="KIIT Hub on GitHub" className="text-muted-foreground hover:text-foreground"><Github className="h-4 w-4" /></a>
+            <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" aria-label="KIIT Hub on Twitter" className="text-muted-foreground hover:text-foreground"><Twitter className="h-4 w-4" /></a>
+            <a href="mailto:support.kiithub@gmail.com" aria-label="Email KIIT Hub support" className="text-muted-foreground hover:text-foreground"><Mail className="h-4 w-4" /></a>
           </div>
         </div>
       </div>
