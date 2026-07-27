@@ -67,7 +67,15 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail, 
     if (!el) return
     const measure = () => {
       const horizontalPadding = window.innerWidth < 640 ? 32 : 48
-      setFitWidth(Math.max(240, el.clientWidth - horizontalPadding))
+      // Uncapped, fullscreen (`fixed inset-0`, no longer bounded by the
+      // page's own max-width layout) let this balloon to the full monitor
+      // width on a wide desktop display — 1800px+ before padding. At DPR 2
+      // that's a 3600+ physical-pixel-wide canvas rasterized fresh on every
+      // document switch, heavy enough to visibly freeze the tab. Capping at
+      // a normal reading-column width fixes both the freeze and the fact
+      // that a PDF stretched edge-to-edge across an ultrawide monitor isn't
+      // good UX anyway.
+      setFitWidth(Math.max(240, Math.min(el.clientWidth - horizontalPadding, 900)))
     }
     measure()
     const observer = new ResizeObserver(measure)

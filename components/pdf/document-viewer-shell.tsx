@@ -178,30 +178,48 @@ export function DocumentViewerShell({ initial }: DocumentViewerShellProps) {
     }
   }
 
-  function goPrev() {
+  // Each mounted document owns its own fullscreen container (its own
+  // PDFViewer's root div). Switching documents hides the previous one's
+  // wrapper (`display:none`), and a fullscreen element being hidden or
+  // detached forces the browser to exit fullscreen on its own, uncontrolled
+  // — happening at the exact same moment the new document mounts and does
+  // its heaviest render work (first pages, fresh canvas). Two expensive
+  // layout/paint operations landing simultaneously is what was freezing the
+  // tab. Exiting fullscreen explicitly first, and waiting for it to finish,
+  // sequences the two instead of letting them collide.
+  async function exitFullscreenIfActive() {
+    if (typeof document === 'undefined' || !document.fullscreenElement) return
+    try { await document.exitFullscreen() } catch { /* best-effort */ }
+  }
+
+  async function goPrev() {
     if (switching || historyIndex <= 0) return
+    await exitFullscreenIfActive()
     const ref = history[historyIndex - 1]
     setHistoryIndex(historyIndex - 1)
     goTo(ref, { pushUrl: true })
   }
 
-  function goNext() {
+  async function goNext() {
     if (switching) return
     if (historyIndex < history.length - 1) {
+      await exitFullscreenIfActive()
       const ref = history[historyIndex + 1]
       setHistoryIndex(historyIndex + 1)
       goTo(ref, { pushUrl: true })
       return
     }
     if (current.gated || !current.suggestions[0]) return
+    await exitFullscreenIfActive()
     const ref: DocRef = { type: current.suggestions[0].type, slug: current.suggestions[0].slug }
     setHistory(h => [...h.slice(0, historyIndex + 1), ref])
     setHistoryIndex(historyIndex + 1)
     goTo(ref, { pushUrl: true })
   }
 
-  function goToSuggestion(item: SuggestionItem) {
+  async function goToSuggestion(item: SuggestionItem) {
     if (switching) return
+    await exitFullscreenIfActive()
     const ref: DocRef = { type: item.type, slug: item.slug }
     setHistory(h => [...h.slice(0, historyIndex + 1), ref])
     setHistoryIndex(historyIndex + 1)
