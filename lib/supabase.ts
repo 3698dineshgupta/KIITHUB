@@ -1,15 +1,29 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://qbgmidxjhqznldfpvory.supabase.co'
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 
-// Create a single supabase client instance for server-side administration (bypassing RLS)
-export const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-  },
-})
+let _supabase: SupabaseClient | null = null
+
+// Lazily constructed, not a module-level `createClient(...)` call: that
+// version threw synchronously ("supabaseKey is required.") the instant this
+// module was imported with an empty key — and Next's build step imports
+// every API route module to statically collect page data, so a host that
+// doesn't inject env vars during the build step (unlike Vercel, which does)
+// failed the entire production build over a key that's only ever actually
+// needed at request time. Each exported function below still throws its own
+// clear error if the env vars are missing before doing any real work.
+function getSupabase(): SupabaseClient {
+  if (!_supabase) {
+    _supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY || 'build-time-placeholder-key', {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    })
+  }
+  return _supabase
+}
 
 export async function supabaseUpload(
   file: Buffer,
@@ -28,7 +42,7 @@ export async function supabaseUpload(
   const uniqueName = `${cleanBase}_${timestamp}.${fileExtension}`
   const filePath = `${uniqueName}`
 
-  const { data, error } = await supabase.storage
+  const { data, error } = await getSupabase().storage
     .from(bucketName)
     .upload(filePath, file, {
       contentType: 'application/pdf',
@@ -54,7 +68,7 @@ export async function supabaseStream(
     throw new Error('Supabase environment variables are not set.')
   }
 
-  const { data, error } = await supabase.storage
+  const { data, error } = await getSupabase().storage
     .from(bucketName)
     .download(path)
 
@@ -76,7 +90,7 @@ export async function supabaseCreateSignedUrl(
     throw new Error('Supabase environment variables are not set.')
   }
 
-  const { data, error } = await supabase.storage
+  const { data, error } = await getSupabase().storage
     .from(bucketName)
     .createSignedUrl(path, expiresInSeconds)
 
@@ -96,7 +110,7 @@ export async function supabaseDelete(
     throw new Error('Supabase environment variables are not set.')
   }
 
-  const { data, error } = await supabase.storage
+  const { data, error } = await getSupabase().storage
     .from(bucketName)
     .remove([path])
 

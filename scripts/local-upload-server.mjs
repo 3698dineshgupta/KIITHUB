@@ -38,7 +38,82 @@ try {
 
 const prisma = new PrismaClient()
 const PORT = process.env.LOCAL_UPLOAD_PORT || 3001
-const MAX_SIZE = 50 * 1024 * 1024 // 50 MB
+// The form sends the `file` part before the `meta` part, so by the time
+// bytes are streaming in we don't yet know which storage provider this
+// upload will use — this raw cap only guards against pathological sizes and
+// must stay above Telegram's real limit (checked separately below, once
+// meta is available) so a Supabase-routed upload never gets truncated.
+const MAX_SIZE = 100 * 1024 * 1024 // 100 MB
+// Telegram's bot getFile method — how the site later streams a document back
+// out — hard-caps at 20MB regardless of upload method; this is Telegram's
+// own platform limit, not configurable. A file saved above this would
+// upload fine (sendDocument's own limit is a separate, higher ~50MB) and
+// then be permanently unviewable, so anything over a safe margin below it
+// gets compressed first for Telegram-bound uploads.
+const TELEGRAM_SAFE_LIMIT = 19 * 1024 * 1024 // 19 MB, leaving headroom
+
+// Same compression trigger applies to Supabase-bound uploads: the
+// `documents` bucket has no file_size_limit override (confirmed via the
+// Storage API — it's null), so a reject there comes from the Supabase
+// project's own default cap. Compressing anything over 19MB first — the
+// same threshold as Telegram, for one consistent behavior — keeps uploads
+// comfortably under that project default regardless of its exact value.
+const SUPABASE_SAFE_LIMIT = 45 * 1024 * 1024 // 45 MB, headroom below the ~50MB project default
+
+const ILOVEPDF_API = 'https://api.ilovepdf.com/v1'
+
+// Plain-JS mirror of lib/ilovepdf.ts — this script runs standalone via
+// `node`, outside Next's module resolution, so it can't import from lib/.
+async function compressPdf(buffer, filename) {
+  const publicKey = process.env.ILOVEPDF_PUBLIC_KEY
+  if (!publicKey) throw new Error('ILOVEPDF_PUBLIC_KEY is not set')
+
+  const authRes = await fetch(`${ILOVEPDF_API}/auth`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ public_key: publicKey }),
+  })
+  if (!authRes.ok) throw new Error(`iLovePDF auth failed (${authRes.status})`)
+  const { token } = await authRes.json()
+
+  const startRes = await fetch(`${ILOVEPDF_API}/start/compress`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!startRes.ok) throw new Error(`iLovePDF start task failed (${startRes.status})`)
+  const { server, task } = await startRes.json()
+
+  const uploadForm = new FormData()
+  uploadForm.append('task', task)
+  uploadForm.append('file', new Blob([buffer], { type: 'application/pdf' }), filename)
+  const uploadRes = await fetch(`https://${server}/v1/upload`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: uploadForm,
+  })
+  if (!uploadRes.ok) throw new Error(`iLovePDF upload failed (${uploadRes.status})`)
+  const { server_filename } = await uploadRes.json()
+
+  const processRes = await fetch(`https://${server}/v1/process`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      task,
+      tool: 'compress',
+      files: [{ server_filename, filename }],
+      compression_level: 'recommended',
+    }),
+  })
+  if (!processRes.ok) throw new Error(`iLovePDF compression failed (${processRes.status})`)
+
+  const downloadRes = await fetch(`https://${server}/v1/download/${task}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!downloadRes.ok) throw new Error(`iLovePDF download failed (${downloadRes.status})`)
+  const arrayBuffer = await downloadRes.arrayBuffer()
+  const compressed = Buffer.from(arrayBuffer)
+
+  return { buffer: compressed, originalSize: buffer.length, compressedSize: compressed.length }
+}
 
 function slugify(t) {
   return t.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim()
@@ -130,6 +205,12 @@ async function handleUpload(req, res) {
     let fileName = 'upload.pdf'
     let meta = null
     let totalSize = 0
+    // Busboy's `limits.fileSize` silently stops reading past the cap instead
+    // of rejecting the upload — without this flag, a file that hit the limit
+    // would still reach the 'finish' handler with a truncated buffer, get
+    // uploaded to Telegram/Supabase as if it were complete, and save a
+    // corrupted, unreadable PDF into the DB with no error anywhere.
+    let truncated = false
 
     const bb = Busboy({ headers: req.headers, limits: { fileSize: MAX_SIZE } })
 
@@ -140,6 +221,7 @@ async function handleUpload(req, res) {
         totalSize += chunk.length
         chunks.push(chunk)
       })
+      stream.on('limit', () => { truncated = true })
       stream.on('end', () => {
         fileBuffer = Buffer.concat(chunks)
       })
@@ -153,6 +235,11 @@ async function handleUpload(req, res) {
 
     bb.on('finish', async () => {
       try {
+        if (truncated) {
+          res.writeHead(413, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: `File exceeds the ${(MAX_SIZE / 1024 / 1024).toFixed(0)} MB upload limit` }))
+          return resolve()
+        }
         if (!fileBuffer || !meta) {
           res.writeHead(400, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ error: 'Missing file or metadata' }))
@@ -190,6 +277,40 @@ async function handleUpload(req, res) {
         let fileId = ''
         let msgId = ''
         let fileSize = 0
+
+        // One shared compression trigger (19MB) for both providers —
+        // Telegram's getFile can never serve anything over ~19-20MB no
+        // matter what, and Supabase's project-wide default cap rejects this
+        // same file today, so there's no provider where staying
+        // uncompressed above this line works. What differs is the ceiling
+        // AFTER compression: Telegram still needs to land under 19MB, but
+        // Supabase has real headroom up to its own limit.
+        if (fileBuffer.length > TELEGRAM_SAFE_LIMIT) {
+          const postCompressionCeiling = storageProvider === 'supabase' ? SUPABASE_SAFE_LIMIT : TELEGRAM_SAFE_LIMIT
+          const providerName = storageProvider === 'supabase' ? 'Supabase' : "Telegram's ~19 MB serving limit"
+
+          console.log(`[Upload] ${(fileBuffer.length / 1024 / 1024).toFixed(1)} MB exceeds the safe limit — compressing via iLovePDF...`)
+          let compressed
+          try {
+            compressed = await compressPdf(fileBuffer, fileName)
+          } catch (err) {
+            console.error('[Upload] iLovePDF compression error:', err)
+            res.writeHead(413, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({
+              error: `File is ${(fileBuffer.length / 1024 / 1024).toFixed(1)} MB and compression failed. Try a smaller file.`,
+            }))
+            return resolve()
+          }
+          if (compressed.compressedSize > postCompressionCeiling) {
+            res.writeHead(413, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({
+              error: `Compressed from ${(compressed.originalSize / 1024 / 1024).toFixed(1)} MB to ${(compressed.compressedSize / 1024 / 1024).toFixed(1)} MB, still over ${providerName}.${storageProvider === 'supabase' ? ' Try compressing the PDF further before uploading.' : ' Use Supabase for this file instead.'}`,
+            }))
+            return resolve()
+          }
+          console.log(`[Upload] Compressed ${(compressed.originalSize / 1024 / 1024).toFixed(1)} MB → ${(compressed.compressedSize / 1024 / 1024).toFixed(1)} MB`)
+          fileBuffer = compressed.buffer
+        }
 
         if (storageProvider === 'supabase') {
           console.log('[Upload] Uploading to Supabase Storage...')
@@ -276,11 +397,17 @@ async function handleUpload(req, res) {
 }
 
 const server = http.createServer(async (req, res) => {
-  if (req.url === '/api/upload') {
+  // Strip query string and a trailing slash so `/api/upload/` or
+  // `/api/upload?x=1` (either could plausibly reach here depending on how
+  // the browser or an extension normalizes the request) still match instead
+  // of silently 404ing.
+  const pathname = (req.url || '').split('?')[0].replace(/\/$/, '') || '/'
+  console.log(`[Upload] ${req.method} ${req.url}`)
+  if (pathname === '/api/upload') {
     await handleUpload(req, res)
   } else {
     res.writeHead(404, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ error: 'Not found' }))
+    res.end(JSON.stringify({ error: 'Not found', requestedUrl: req.url }))
   }
 })
 

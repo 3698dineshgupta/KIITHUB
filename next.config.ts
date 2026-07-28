@@ -49,7 +49,12 @@ const nextConfig: NextConfig = {
     //   that worker). Missing either breaks every PDF in production with a
     //   "Secure Stream Failure" — confirmed by reading pdfjs-dist's actual
     //   worker-construction code, not guessed.
-    // - connect: every fetch() in this app is same-origin.
+    // - connect: every fetch() in this app is same-origin, except the admin
+    //   upload form's dev-only large-file path, which POSTs directly to
+    //   scripts/local-upload-server.mjs on localhost:3001 — a different
+    //   origin (different port) that a bare 'self' silently blocks with no
+    //   network trace at all, indistinguishable from the server being down.
+    //   That local server doesn't exist in production, so this is dev-only.
     const isDev = process.env.NODE_ENV === 'development'
     const csp = [
       `default-src 'self'`,
@@ -57,7 +62,7 @@ const nextConfig: NextConfig = {
       `style-src 'self' 'unsafe-inline'`,
       `img-src 'self' blob: data: https:`,
       `font-src 'self' data:`,
-      `connect-src 'self'${isDev ? ' ws:' : ''}`,
+      `connect-src 'self'${isDev ? ' ws: http://localhost:3001' : ''}`,
       `worker-src 'self' blob: https://unpkg.com`,
       `frame-ancestors 'self'`,
       `base-uri 'self'`,

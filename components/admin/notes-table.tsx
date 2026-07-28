@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Trash2, Eye, Crown, Loader2, ExternalLink } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Trash2, Eye, Crown, Loader2, ExternalLink, Search } from 'lucide-react'
 import { formatDate, formatBytes } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -16,9 +17,15 @@ const TYPE_COLORS: Record<string, string> = {
   ASSIGNMENT: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
 }
 
-export function AdminNotesTable({ notes, total, page }: { notes: any[]; total: number; page: number }) {
+export function AdminNotesTable({ notes, total, page, search }: { notes: any[]; total: number; page: number; search?: string }) {
   const router = useRouter()
+  const [query, setQuery] = useState(search ?? '')
   const [loading, setLoading] = useState<string | null>(null)
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    router.push(`/admin/notes?search=${encodeURIComponent(query)}`)
+  }
 
   const doDelete = async (id: string) => {
     if (!confirm('Delete this note? This will also remove it from Telegram.')) return
@@ -57,7 +64,16 @@ export function AdminNotesTable({ notes, total, page }: { notes: any[]; total: n
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
+      <form onSubmit={handleSearch} className="flex gap-2 max-w-sm">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search by title or subject..." value={query} onChange={e => setQuery(e.target.value)} className="pl-9" />
+        </div>
+        <Button type="submit" size="sm">Search</Button>
+      </form>
+
+      <div className="space-y-2">
       {notes.map(note => (
         <Card key={note.id} className="p-4">
           <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -135,6 +151,7 @@ export function AdminNotesTable({ notes, total, page }: { notes: any[]; total: n
           </div>
         </Card>
       ))}
+      </div>
 
       <div className="flex items-center justify-between text-sm text-muted-foreground pt-2">
         <span>Showing {notes.length} of {total}</span>
