@@ -18,6 +18,7 @@ export const metadata: Metadata = {
   description,
   keywords: ['KIIT', 'KIIT Hub', 'notes', 'PYQ', 'previous year questions', 'study materials', 'SGPA calculator', 'CGPA calculator', 'KIIT merchandise'],
   robots: { index: true, follow: true },
+  alternates: { canonical: '/' },
   openGraph: {
     siteName: SITE_NAME,
     title: 'KIIT Hub — Notes & Study Materials',
