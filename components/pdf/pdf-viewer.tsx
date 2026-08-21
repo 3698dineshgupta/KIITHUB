@@ -188,22 +188,27 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail, 
       {nav && <DocumentNavArrows {...nav} />}
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur-sm z-30 select-none">
-        <span className="text-sm font-semibold truncate max-w-[200px] sm:max-w-sm flex items-center gap-1.5">
-          {isPremium && <Badge variant="premium" className="text-[10px]">PRO</Badge>}
-          {title}
+      <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-3 border-b bg-background/95 backdrop-blur-sm z-30 select-none">
+        {/* flex-1 min-w-0 (not a hardcoded max-w) so the title claims whatever
+            space the fixed-width button cluster doesn't need — on narrow
+            phones the cluster alone is ~150px, and a fixed max-w-[200px]
+            here left almost nothing for the title, truncating it to 2-3
+            characters. */}
+        <span className="text-sm font-semibold truncate flex-1 min-w-0 flex items-center gap-1.5">
+          {isPremium && <Badge variant="premium" className="text-[10px] flex-shrink-0">PRO</Badge>}
+          <span className="truncate">{title}</span>
         </span>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-0.5 sm:gap-1.5 flex-shrink-0">
           <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" onClick={() => setZoom(z => Math.max(0.6, z - 0.15))} title="Zoom Out">
             <ZoomOut className="h-4 w-4" />
           </Button>
-          <span className="text-xs text-muted-foreground w-12 text-center font-semibold tabular-nums">
+          <span className="hidden sm:inline-block text-xs text-muted-foreground w-12 text-center font-semibold tabular-nums">
             {Math.round(zoom * 100)}%
           </span>
           <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" onClick={() => setZoom(z => Math.min(2.0, z + 0.15))} title="Zoom In">
             <ZoomIn className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 ml-1 cursor-pointer" onClick={handleFullscreen} title="Fullscreen">
+          <Button variant="ghost" size="icon" className="h-8 w-8 sm:ml-1 cursor-pointer" onClick={handleFullscreen} title="Fullscreen">
             {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </Button>
           <Button
