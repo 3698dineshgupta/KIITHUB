@@ -20,6 +20,8 @@ export default function robots(): MetadataRoute.Robots {
         '/auth',
         '/merchandise/sell',
         '/merchandise/my-listings',
+        '/requests',
+        '/my-reports',
       ],
     },
     sitemap: `${baseUrl}/sitemap.xml`,

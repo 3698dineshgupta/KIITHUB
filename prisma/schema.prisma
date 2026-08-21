@@ -51,6 +51,16 @@ enum NotificationType {
   BUG_REPORT_RECEIVED
   BUG_REPORT_STATUS_CHANGED
   BUG_REPORT_RESOLVED
+  REQUEST_RECEIVED
+  REQUEST_STATUS_CHANGED
+  REQUEST_FULFILLED
+}
+
+enum RequestStatus {
+  PENDING
+  IN_PROGRESS
+  FULFILLED
+  REJECTED
 }
 
 enum ReferralStatus {
@@ -164,6 +174,8 @@ model User {
   referralRewards    ReferralReward[]
   bugReports         BugReport[]
   bugComments        BugComment[]
+  contentRequests    ContentRequest[]
+  contactMessages    ContactMessage[]
 
   @@index([email])
   @@index([membershipStatus])
@@ -595,4 +607,48 @@ model BugComment {
   createdAt DateTime  @default(now())
 
   @@index([bugId])
+}
+
+// Premium-only: a student asks for a specific paper/note that isn't on the
+// site yet. branch/semester are free text, not FKs to Branch/Semester — the
+// request is exactly for content that doesn't exist in the catalog yet, so
+// there's nothing to link against until an admin fulfills it.
+model ContentRequest {
+  id            String        @id @default(cuid())
+  requestCode   String        @unique
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  description   String
+  branch        String?
+  semester      String?
+  status        RequestStatus @default(PENDING)
+  // Admin-facing reply shown back to the requester (rejection reason,
+  // progress note, or a pointer to where the fulfilled content now lives).
+  adminResponse String?
+  fulfilledUrl  String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Open to everyone, logged in or not — deliberately NOT tied to a User
+// account: `email` is whatever personal address the visitor typed in, since
+// that's where the admin replies, not necessarily their account email.
+model ContactMessage {
+  id          String    @id @default(cuid())
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name        String?
+  email       String
+  message     String
+  ipAddress   String?
+  respondedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([respondedAt])
+  @@index([createdAt])
 }

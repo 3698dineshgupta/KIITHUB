@@ -44,7 +44,7 @@ export default function HelpPage() {
           <ReportBugTrigger variant="default" size="default" pageUrl="/help" />
         </div>
         <p className="text-xs text-muted-foreground pt-2 flex items-center justify-center gap-1.5">
-          <Mail className="h-3.5 w-3.5" />Or reach us directly at <a href="mailto:support.kiithub@gmail.com" className="underline hover:text-foreground">support.kiithub@gmail.com</a>
+          <Mail className="h-3.5 w-3.5" />Or use our <Link href="/contact" className="underline hover:text-foreground">Contact form</Link> to reach us directly by email
         </p>
       </div>
 
