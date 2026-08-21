@@ -5,11 +5,19 @@ import { telegramGetFileUrl } from '@/lib/telegram'
 import { supabaseCreateSignedUrl } from '@/lib/supabase'
 
 // Documents under this size get fully buffered and cached in Redis (base64)
-// so repeat opens skip Telegram/Supabase entirely. Kept well under Upstash's
-// per-value size limits even after base64's ~33% inflation. Larger files are
-// streamed straight through instead of buffered — not cached, but avoids
-// paying for a full server-side download before the client sees any bytes.
-const MAX_CACHE_BYTES = 700 * 1024
+// so repeat opens skip Telegram/Supabase entirely — every uncached open was
+// re-fetching from Telegram's file API on every single view, by every user,
+// which is what was making the "Preparing secure stream..." step slow.
+// Verified live against this project's actual Upstash instance: a 5MB SET
+// succeeds, an 8MB one hits Upstash's real request-size ceiling ("max
+// request size exceeded. Limit: 10485760 bytes"). 3MB (post-base64 ~4MB
+// request) sits well under that with margin, and covers 94.5% of this
+// project's published note/PYQ files by actual size (measured: p90 1.3MB,
+// p95 3.7MB) — pushing to 6MB only reaches 95.6% for roughly double the
+// Redis storage, not worth it. Larger files are streamed straight through
+// instead of buffered — not cached, but avoids paying for a full
+// server-side download before the client sees any bytes.
+const MAX_CACHE_BYTES = 3 * 1024 * 1024
 
 const devTiming = process.env.NODE_ENV !== 'production'
 
