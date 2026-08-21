@@ -1,7 +1,7 @@
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Eye, BookOpen, Calendar, HardDrive, FileText, Crown, Flame } from 'lucide-react'
-import { formatDate, formatBytes } from '@/lib/utils'
+import { formatDate, formatBytes, examTypeShort } from '@/lib/utils'
 
 const TYPE_LABELS: Record<string, string> = { NOTE:'Note', PYQ:'PYQ', SYLLABUS:'Syllabus', LAB_MANUAL:'Lab Manual', ASSIGNMENT:'Assignment' }
 
@@ -12,6 +12,7 @@ export function NoteMetaCard({ note }: { note: any }) {
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap gap-2 mb-3">
             <Badge variant="secondary">{TYPE_LABELS[note.contentType] ?? 'Note'}</Badge>
+            {note.contentType === 'PYQ' && note.examType && <Badge variant="secondary">{examTypeShort(note.examType)}</Badge>}
             <Badge variant="secondary">{note.branch?.shortName}</Badge>
             <Badge variant="secondary">Sem {note.semester?.number}</Badge>
             {note.isPremium && <Badge variant="premium" className="gap-1"><Crown className="h-3 w-3" />Premium</Badge>}

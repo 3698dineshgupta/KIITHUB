@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { cache, CACHE_KEYS } from '@/lib/redis'
+import { examTypeShort } from '@/lib/utils'
 
 export interface SuggestionItem {
   type: 'note' | 'pyq'
@@ -156,7 +157,7 @@ export async function getSuggestions(ctx: SuggestionContext): Promise<Suggestion
       title: c.title,
       subjectName: c.subject.name,
       semesterNumber: c.semester.number,
-      typeLabel: c.kind === 'pyq' ? `PYQ · ${c.examType}` : (CONTENT_TYPE_LABELS[c.contentType] ?? 'Notes'),
+      typeLabel: c.kind === 'pyq' ? `PYQ · ${examTypeShort(c.examType)}` : (CONTENT_TYPE_LABELS[c.contentType] ?? 'Notes'),
       fileSize: c.fileSize,
       viewCount: c.viewCount,
       isPremium: c.isPremium,

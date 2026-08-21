@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { Eye, BookOpen, Lock, Crown, Bookmark, BookmarkCheck } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { cn, formatRelativeTime, formatBytes } from '@/lib/utils'
+import { cn, formatRelativeTime, formatBytes, examTypeShort } from '@/lib/utils'
 import { useState } from 'react'
 import { useOpenDocument } from '@/hooks/use-open-document'
 
@@ -50,6 +50,11 @@ export function NoteCard({ note, showBookmark = false }: NoteCardProps) {
               <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', TYPE_COLORS[note.contentType] ?? TYPE_COLORS.NOTE)}>
                 {TYPE_LABELS[note.contentType] ?? 'Note'}
               </span>
+              {note.contentType === 'PYQ' && note.examType && (
+                <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', note.examType === 'Mid Semester' ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400')}>
+                  {examTypeShort(note.examType)}
+                </span>
+              )}
               {note.isPremium && (
                 <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                   <Crown className="h-3 w-3" />Premium

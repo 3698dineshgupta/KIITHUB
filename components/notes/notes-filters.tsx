@@ -5,6 +5,7 @@ import { Search, X, SlidersHorizontal, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useDebouncedParam } from '@/hooks/use-debounced-param'
 
 const CONTENT_TYPES = [
   { value: 'NOTE', label: 'Notes' },
@@ -39,7 +40,10 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
     [router, pathname, sp]
   )
 
+  const search = useDebouncedParam(sp.get('search') ?? '', v => updateParam('search', v || null))
+
   const clearAll = () => {
+    search.reset('')
     startTransition(() => {
       router.push(pathname)
     })
@@ -106,10 +110,9 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search by title, subject, keywords..."
-          defaultValue={sp.get('search') ?? ''}
-          onChange={e => updateParam('search', e.target.value || null)}
+          value={search.value}
+          onChange={e => search.onChange(e.target.value)}
           className="pl-9 pr-10"
-          disabled={isPending}
         />
         {isPending && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">

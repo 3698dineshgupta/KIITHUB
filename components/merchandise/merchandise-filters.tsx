@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CATEGORY_OPTIONS, CONDITION_OPTIONS } from './merch-constants'
+import { useDebouncedParam } from '@/hooks/use-debounced-param'
 
 export function MerchandiseFilters() {
   const router = useRouter()
@@ -26,7 +27,12 @@ export function MerchandiseFilters() {
     [router, pathname, sp]
   )
 
+  const search = useDebouncedParam(sp.get('search') ?? '', v => updateParam('search', v || null))
+  const minPrice = useDebouncedParam(sp.get('minPrice') ?? '', v => updateParam('minPrice', v || null))
+  const maxPrice = useDebouncedParam(sp.get('maxPrice') ?? '', v => updateParam('maxPrice', v || null))
+
   const clearAll = () => {
+    search.reset(''); minPrice.reset(''); maxPrice.reset('')
     startTransition(() => {
       router.push(pathname)
     })
@@ -39,10 +45,9 @@ export function MerchandiseFilters() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search for items..."
-          defaultValue={sp.get('search') ?? ''}
-          onChange={e => updateParam('search', e.target.value || null)}
+          value={search.value}
+          onChange={e => search.onChange(e.target.value)}
           className="pl-9 pr-10"
-          disabled={isPending}
         />
         {isPending && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -77,18 +82,16 @@ export function MerchandiseFilters() {
         <Input
           type="number"
           placeholder="Min ₹"
-          defaultValue={sp.get('minPrice') ?? ''}
-          onChange={e => updateParam('minPrice', e.target.value || null)}
+          value={minPrice.value}
+          onChange={e => minPrice.onChange(e.target.value)}
           className="w-24"
-          disabled={isPending}
         />
         <Input
           type="number"
           placeholder="Max ₹"
-          defaultValue={sp.get('maxPrice') ?? ''}
-          onChange={e => updateParam('maxPrice', e.target.value || null)}
+          value={maxPrice.value}
+          onChange={e => maxPrice.onChange(e.target.value)}
           className="w-24"
-          disabled={isPending}
         />
 
         <Select value={sp.get('sort') ?? 'newest'} onValueChange={v => updateParam('sort', v)} disabled={isPending}>

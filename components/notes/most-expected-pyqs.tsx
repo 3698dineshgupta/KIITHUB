@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Flame, Calendar, Eye, Crown, ArrowRight } from 'lucide-react'
 import { useOpenDocument } from '@/hooks/use-open-document'
+import { cn, examTypeShort } from '@/lib/utils'
 
 interface MostExpectedPYQ {
   id: string
@@ -60,6 +61,9 @@ export function MostExpectedPYQs({ pyqs }: { pyqs: MostExpectedPYQ[] }) {
                     <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-gradient-to-r from-red-500 to-orange-500 text-white">
                       <Flame className="h-2.5 w-2.5" />Predicted
                     </span>
+                    <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full', pyq.examType === 'Mid Semester' ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400')}>
+                      {examTypeShort(pyq.examType)}
+                    </span>
                     <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 flex items-center gap-1">
                       <Calendar className="h-2.5 w-2.5" />{pyq.year}
                     </span>
@@ -72,7 +76,7 @@ export function MostExpectedPYQs({ pyqs }: { pyqs: MostExpectedPYQ[] }) {
                   <h3 className="font-semibold text-sm leading-snug line-clamp-2 mb-2 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
                     {pyq.title}
                   </h3>
-                  <p className="text-xs text-muted-foreground mb-3">{pyq.subject.name} · Sem {pyq.semester.number} · {pyq.branch.shortName} · {pyq.examType}</p>
+                  <p className="text-xs text-muted-foreground mb-3">{pyq.subject.name} · Sem {pyq.semester.number} · {pyq.branch.shortName}</p>
                   <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-orange-100 dark:border-orange-900/40">
                     <span className="flex items-center gap-1"><Eye className="h-3 w-3" />{pyq.viewCount} views</span>
                     <span className="flex items-center gap-1 font-medium text-orange-600 dark:text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity">

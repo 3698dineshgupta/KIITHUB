@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Eye, Crown, Lock, FileText, Calendar, Flame } from 'lucide-react'
 import { useOpenDocument } from '@/hooks/use-open-document'
+import { cn, examTypeShort } from '@/lib/utils'
 
 interface PYQCardProps {
   pyq: {
@@ -37,6 +38,9 @@ export function PYQCard({ pyq }: PYQCardProps) {
               </span>
             )}
             <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">PYQ</span>
+            <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', pyq.examType === 'Mid Semester' ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400')}>
+              {examTypeShort(pyq.examType)}
+            </span>
             <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 flex items-center gap-1">
               <Calendar className="h-3 w-3" />{pyq.year}
             </span>
@@ -54,8 +58,6 @@ export function PYQCard({ pyq }: PYQCardProps) {
             <span>Sem {pyq.semester.number}</span>
             <span>{pyq.branch.shortName}</span>
           </div>
-
-          <div className="text-xs text-muted-foreground mb-1">{pyq.examType}</div>
 
           <div className="flex items-center justify-between text-xs text-muted-foreground mt-auto pt-3 border-t">
             <div className="flex items-center gap-3">

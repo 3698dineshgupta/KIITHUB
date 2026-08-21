@@ -7,6 +7,10 @@ export function formatDate(d: Date|string) { return new Date(d).toLocaleDateStri
 export function formatRelativeTime(d: Date|string) { const diff=(Date.now()-new Date(d).getTime())/60000; if(diff<1)return 'just now'; if(diff<60)return `${Math.floor(diff)}m ago`; if(diff<1440)return `${Math.floor(diff/60)}h ago`; if(diff<43200)return `${Math.floor(diff/1440)}d ago`; return formatDate(d) }
 export function isPremiumActive(status: string, expiry?: Date|null) { return status==='PREMIUM' && !!expiry && new Date(expiry)>new Date() }
 export function daysLeft(expiry?: Date|null) { if(!expiry) return 0; return Math.max(0,Math.ceil((new Date(expiry).getTime()-Date.now())/(86400000))) }
+// PYQ.examType is free text but in practice only ever "Mid Semester" or "End
+// Semester" (the admin upload/edit forms only offer those two) — shortened
+// so it reads as a compact badge on a card instead of a wrapping label.
+export function examTypeShort(examType: string) { return examType === 'Mid Semester' ? 'Midsem' : examType === 'End Semester' ? 'Endsem' : examType }
 export function formatDuration(totalSec: number) { if(!totalSec||totalSec<60) return '<1m'; const h=Math.floor(totalSec/3600),m=Math.floor((totalSec%3600)/60); return h>0 ? `${h}h ${m}m` : `${m}m` }
 // Matches app/api/presence/heartbeat/route.ts's 30s beat interval: 3 missed
 // beats of slack for network jitter/backgrounding before reading "offline".
