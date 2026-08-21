@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Upload, Loader2, CheckCircle, AlertCircle, File } from 'lucide-react'
+import { Upload, Loader2, CheckCircle, AlertCircle, File, Flame } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const CONTENT_TYPES = [
@@ -48,6 +48,7 @@ export function AdminUploadForm({
   const [contentType, setContentType] = useState('NOTE')
   const [examType, setExamType] = useState('End Semester')
   const [isPremium, setIsPremium] = useState(false)
+  const [isMostExpected, setIsMostExpected] = useState(false)
   const [tags, setTags] = useState('')
   const [storageProvider, setStorageProvider] = useState(defaultStorageProvider)
 
@@ -74,6 +75,7 @@ export function AdminUploadForm({
       form.append('meta', JSON.stringify({
         title, description, subjectName, academicBranch, academicSemester, classYear,
         contentType, examType: contentType === 'PYQ' ? examType : undefined, isPremium,
+        isMostExpected: contentType === 'PYQ' ? isMostExpected : undefined,
         tags: tags.split(',').map(t => t.trim()).filter(Boolean),
         storageProvider,
       }))
@@ -86,7 +88,7 @@ export function AdminUploadForm({
       if (!res.ok) throw new Error(data.error || 'Upload failed')
 
       setStatus('success')
-      setTitle(''); setDescription(''); setSubjectName(''); setAcademicBranch(''); setAcademicSemester(''); setClassYear(''); setTags(''); setFile(null)
+      setTitle(''); setDescription(''); setSubjectName(''); setAcademicBranch(''); setAcademicSemester(''); setClassYear(''); setTags(''); setFile(null); setIsMostExpected(false)
       setTimeout(() => router.push('/admin/notes'), 2000)
     } catch (err: any) {
       if (err.message?.includes('Failed to fetch') && isLargeFile) {
@@ -271,15 +273,33 @@ export function AdminUploadForm({
           </div>
 
           {contentType === 'PYQ' && (
-            <div>
-              <Label className="mb-2 block">Exam Type</Label>
-              <Select value={examType} onValueChange={setExamType}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Mid Semester">Mid Semester</SelectItem>
-                  <SelectItem value="End Semester">End Semester</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="mb-2 block">Exam Type</Label>
+                <Select value={examType} onValueChange={setExamType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Mid Semester">Mid Semester</SelectItem>
+                    <SelectItem value="End Semester">End Semester</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="mb-2 block">Prediction</Label>
+                <button
+                  type="button"
+                  onClick={() => setIsMostExpected(v => !v)}
+                  className={cn(
+                    'flex items-center justify-center gap-1.5 w-full h-10 rounded-lg border text-sm font-medium transition-colors',
+                    isMostExpected
+                      ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white border-transparent'
+                      : 'hover:bg-muted'
+                  )}
+                >
+                  <Flame className="h-4 w-4" />
+                  {isMostExpected ? 'Most Expected' : 'Mark as Most Expected'}
+                </button>
+              </div>
             </div>
           )}
 

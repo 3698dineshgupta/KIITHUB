@@ -3,6 +3,7 @@ import { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 import { NotesFilters } from '@/components/notes/notes-filters'
 import { PYQList } from '@/components/notes/pyq-list'
+import { MostExpectedPYQs } from '@/components/notes/most-expected-pyqs'
 import { Skeleton } from '@/components/ui/skeleton'
 export const metadata: Metadata = {
   title: 'Previous Year Questions',
@@ -23,10 +24,16 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 export default async function PYQPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const resolvedSearchParams = await searchParams
-  const [branches, semesters, subjects] = await Promise.all([
+  const [branches, semesters, subjects, mostExpected] = await Promise.all([
     prisma.branch.findMany({ orderBy: { name: 'asc' } }),
     prisma.semester.findMany({ orderBy: { number: 'asc' } }),
     prisma.subject.findMany({ orderBy: { name: 'asc' }, include: { branch: true, semester: true } }),
+    prisma.pYQ.findMany({
+      where: { isMostExpected: true, isPublished: true },
+      orderBy: { createdAt: 'desc' },
+      take: 9,
+      include: { subject: true, branch: true, semester: true },
+    }),
   ])
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -34,6 +41,7 @@ export default async function PYQPage({ searchParams }: { searchParams: Promise<
         <h1 className="text-3xl font-bold mb-2">Previous Year Questions</h1>
         <p className="text-muted-foreground">Browse PYQs by year, semester, and subject.</p>
       </div>
+      <MostExpectedPYQs pyqs={mostExpected} />
       <Suspense fallback={<div className="h-16 animate-pulse rounded-xl bg-muted mb-6" />}>
         <NotesFilters branches={branches} semesters={semesters} subjects={subjects} />
       </Suspense>

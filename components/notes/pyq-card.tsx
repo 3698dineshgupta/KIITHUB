@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
-import { Eye, Crown, Lock, FileText, Calendar } from 'lucide-react'
+import { Eye, Crown, Lock, FileText, Calendar, Flame } from 'lucide-react'
 import { useOpenDocument } from '@/hooks/use-open-document'
 
 interface PYQCardProps {
@@ -12,6 +12,7 @@ interface PYQCardProps {
     year: number
     examType: string
     isPremium: boolean
+    isMostExpected?: boolean
     viewCount: number
     subject: { name: string }
     semester: { number: number }
@@ -24,10 +25,17 @@ export function PYQCard({ pyq }: PYQCardProps) {
 
   return (
     <Link href={`/pyq/${pyq.slug}`} onClick={handleOpen(pyq.title)}>
-      <Card className={`h-full hover:shadow-lg hover:-translate-y-1 transition-all duration-200 cursor-pointer group overflow-hidden ${pyq.isPremium ? 'border-amber-300 dark:border-amber-700' : ''}`}>
-        {pyq.isPremium && <div className="h-1 bg-gradient-to-r from-amber-400 to-orange-500" />}
+      <Card className={`h-full hover:shadow-lg hover:-translate-y-1 transition-all duration-200 cursor-pointer group overflow-hidden ${pyq.isMostExpected ? 'border-orange-300 dark:border-orange-700 ring-1 ring-orange-200 dark:ring-orange-900/40' : pyq.isPremium ? 'border-amber-300 dark:border-amber-700' : ''}`}>
+        {pyq.isMostExpected ? (
+          <div className="h-1 bg-gradient-to-r from-red-500 to-orange-500" />
+        ) : pyq.isPremium && <div className="h-1 bg-gradient-to-r from-amber-400 to-orange-500" />}
         <CardContent className="p-5 flex flex-col h-full">
           <div className="flex items-center gap-2 mb-3 flex-wrap">
+            {pyq.isMostExpected && (
+              <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-gradient-to-r from-red-500 to-orange-500 text-white">
+                <Flame className="h-3 w-3" />Most Expected
+              </span>
+            )}
             <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">PYQ</span>
             <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 flex items-center gap-1">
               <Calendar className="h-3 w-3" />{pyq.year}

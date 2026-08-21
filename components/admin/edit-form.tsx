@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2, CheckCircle, AlertCircle, Save } from 'lucide-react'
+import { Loader2, CheckCircle, AlertCircle, Save, Flame } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const CONTENT_TYPES = [
@@ -40,6 +40,7 @@ export function AdminEditForm({ initialData, branches, semesters, subjects }: Pr
   const [contentType, setContentType] = useState(initialData.contentType || 'NOTE')
   const [examType, setExamType] = useState(initialData.examType || 'End Semester')
   const [isPremium, setIsPremium] = useState(initialData.isPremium || false)
+  const [isMostExpected, setIsMostExpected] = useState(initialData.isMostExpected || false)
   const [tags, setTags] = useState(initialData.tags ? initialData.tags.map((t: any) => t.tag).join(', ') : '')
 
   const isPyq = initialData.contentType === 'PYQ'
@@ -63,9 +64,10 @@ export function AdminEditForm({ initialData, branches, semesters, subjects }: Pr
         academicBranch, 
         academicSemester, 
         classYear,
-        contentType, 
-        examType: contentType === 'PYQ' ? examType : undefined, 
+        contentType,
+        examType: contentType === 'PYQ' ? examType : undefined,
         isPremium,
+        isMostExpected: isPyq ? isMostExpected : undefined,
         tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean),
       }
 
@@ -191,15 +193,33 @@ export function AdminEditForm({ initialData, branches, semesters, subjects }: Pr
           </div>
 
           {contentType === 'PYQ' && (
-            <div>
-              <Label className="mb-2 block">Exam Type</Label>
-              <Select value={examType} onValueChange={setExamType}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Mid Semester">Mid Semester</SelectItem>
-                  <SelectItem value="End Semester">End Semester</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="mb-2 block">Exam Type</Label>
+                <Select value={examType} onValueChange={setExamType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Mid Semester">Mid Semester</SelectItem>
+                    <SelectItem value="End Semester">End Semester</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="mb-2 block">Prediction</Label>
+                <button
+                  type="button"
+                  onClick={() => setIsMostExpected((v: boolean) => !v)}
+                  className={cn(
+                    'flex items-center justify-center gap-1.5 w-full h-10 rounded-lg border text-sm font-medium transition-colors',
+                    isMostExpected
+                      ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white border-transparent'
+                      : 'hover:bg-muted'
+                  )}
+                >
+                  <Flame className="h-4 w-4" />
+                  {isMostExpected ? 'Most Expected' : 'Mark as Most Expected'}
+                </button>
+              </div>
             </div>
           )}
 

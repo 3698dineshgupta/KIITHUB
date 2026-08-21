@@ -4,21 +4,23 @@ import { SemesterGrid } from '@/components/home/semester-grid'
 import { StatsSection } from '@/components/home/stats'
 import { PremiumCTA } from '@/components/home/premium-cta'
 import { SGPAPreview } from '@/components/home/sgpa-preview'
+import { MostExpectedPYQs } from '@/components/notes/most-expected-pyqs'
 import { prisma } from '@/lib/prisma'
 
 async function getHomeData() {
   try {
-    const [latestNotes, topNotes, semesters, stats] = await Promise.all([
+    const [latestNotes, topNotes, semesters, stats, mostExpectedPyqs] = await Promise.all([
       prisma.note.findMany({ where: { isPublished: true }, orderBy: { createdAt: 'desc' }, take: 8, include: { subject: true, branch: true, semester: true, tags: true } }),
       prisma.note.findMany({ where: { isPublished: true }, orderBy: { viewCount: 'desc' }, take: 4, include: { subject: true, branch: true, semester: true, tags: true } }),
       prisma.semester.findMany({ orderBy: { number: 'asc' }, include: { _count: { select: { notes: true, pyqs: true } } } }),
       prisma.$transaction([prisma.user.count(), prisma.note.count(), prisma.pYQ.count(), prisma.view.count()]),
+      prisma.pYQ.findMany({ where: { isMostExpected: true, isPublished: true }, orderBy: { createdAt: 'desc' }, take: 6, include: { subject: true, branch: true, semester: true } }),
     ])
-    return { latestNotes, topNotes, semesters, stats: { users: stats[0], notes: stats[1], pyqs: stats[2], views: stats[3] } }
+    return { latestNotes, topNotes, semesters, stats: { users: stats[0], notes: stats[1], pyqs: stats[2], views: stats[3] }, mostExpectedPyqs }
   } catch (err) {
     // If DB is unreachable, return a safe fallback so the homepage doesn't crash.
     console.error('getHomeData error:', err)
-    return { latestNotes: [], topNotes: [], semesters: [], stats: { users: 0, notes: 0, pyqs: 0, views: 0 } }
+    return { latestNotes: [], topNotes: [], semesters: [], stats: { users: 0, notes: 0, pyqs: 0, views: 0 }, mostExpectedPyqs: [] }
   }
 }
 
@@ -41,6 +43,11 @@ export default async function HomePage() {
     <div className="min-h-screen">
       <HeroSection />
       <StatsSection stats={data.stats} />
+      {data.mostExpectedPyqs.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <MostExpectedPYQs pyqs={data.mostExpectedPyqs} />
+        </div>
+      )}
       <FeaturedNotes title="Latest Notes" notes={data.latestNotes} />
       <SemesterGrid semesters={data.semesters} />
       <FeaturedNotes title="Trending This Week" notes={data.topNotes} variant="trending" />

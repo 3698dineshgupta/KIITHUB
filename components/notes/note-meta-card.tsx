@@ -1,6 +1,6 @@
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Eye, BookOpen, Calendar, HardDrive, FileText, Crown } from 'lucide-react'
+import { Eye, BookOpen, Calendar, HardDrive, FileText, Crown, Flame } from 'lucide-react'
 import { formatDate, formatBytes } from '@/lib/utils'
 
 const TYPE_LABELS: Record<string, string> = { NOTE:'Note', PYQ:'PYQ', SYLLABUS:'Syllabus', LAB_MANUAL:'Lab Manual', ASSIGNMENT:'Assignment' }
@@ -15,6 +15,11 @@ export function NoteMetaCard({ note }: { note: any }) {
             <Badge variant="secondary">{note.branch?.shortName}</Badge>
             <Badge variant="secondary">Sem {note.semester?.number}</Badge>
             {note.isPremium && <Badge variant="premium" className="gap-1"><Crown className="h-3 w-3" />Premium</Badge>}
+            {note.isMostExpected && (
+              <Badge className="gap-1 border-transparent bg-gradient-to-r from-red-500 to-orange-500 text-white">
+                <Flame className="h-3 w-3" />Most Expected
+              </Badge>
+            )}
           </div>
           <h1 className="text-2xl font-bold mb-2">{note.title}</h1>
           {note.description && <p className="text-muted-foreground">{note.description}</p>}

@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Trash2, Eye, Crown, Loader2, ExternalLink, Search } from 'lucide-react'
+import { Trash2, Eye, Crown, Loader2, ExternalLink, Search, Flame } from 'lucide-react'
 import { formatDate, formatBytes } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -63,6 +63,19 @@ export function AdminNotesTable({ notes, total, page, search }: { notes: any[]; 
     setLoading(null)
   }
 
+  const toggleMostExpected = async (id: string, current: boolean) => {
+    setLoading('exp_' + id)
+    try {
+      await fetch(`/api/admin/notes/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isMostExpected: !current }),
+      })
+      router.refresh()
+    } catch {}
+    setLoading(null)
+  }
+
   return (
     <div className="space-y-4">
       <form onSubmit={handleSearch} className="flex gap-2 max-w-sm">
@@ -83,6 +96,11 @@ export function AdminNotesTable({ notes, total, page, search }: { notes: any[]; 
                   {note.contentType.replace('_', ' ')}
                 </span>
                 {note.isPremium && <Badge variant="premium" className="text-xs gap-1"><Crown className="h-3 w-3" />Premium</Badge>}
+                {note.isMostExpected && (
+                  <Badge className="text-xs gap-1 border-transparent bg-gradient-to-r from-red-500 to-orange-500 text-white">
+                    <Flame className="h-3 w-3" />Most Expected
+                  </Badge>
+                )}
                 {!note.isPublished && <Badge variant="secondary" className="text-xs">Draft</Badge>}
                 <span className="text-xs text-muted-foreground">{note.branch.shortName} · Sem {note.semester.number}</span>
               </div>
@@ -124,6 +142,20 @@ export function AdminNotesTable({ notes, total, page, search }: { notes: any[]; 
                   note.isPremium ? 'Make Free' : <><Crown className="h-3 w-3 mr-1" />Make Premium</>
                 }
               </Button>
+
+              {note.contentType === 'PYQ' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs"
+                  disabled={!!loading}
+                  onClick={() => toggleMostExpected(note.id, note.isMostExpected)}
+                >
+                  {loading === 'exp_' + note.id ? <Loader2 className="h-3 w-3 animate-spin" /> :
+                    note.isMostExpected ? 'Unmark Expected' : <><Flame className="h-3 w-3 mr-1" />Mark Expected</>
+                  }
+                </Button>
+              )}
 
               <Button
                 size="sm"

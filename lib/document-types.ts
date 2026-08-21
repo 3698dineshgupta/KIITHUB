@@ -5,6 +5,7 @@ export interface DocumentMeta {
   title: string
   description?: string | null
   isPremium: boolean
+  isMostExpected?: boolean
   viewCount: number
   fileSize: number | null
   totalPages?: number | null

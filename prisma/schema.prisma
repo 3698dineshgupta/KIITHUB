@@ -326,10 +326,14 @@ model PYQ {
   academicBranch   String?
   academicSemester String?
   classYear        String?
+  // Curated by an admin/moderator, not derived from the title — a paper
+  // predicting likely exam questions, distinct from an actual past paper.
+  isMostExpected   Boolean    @default(false)
 
   @@index([year])
   @@index([branchId, semesterId])
   @@index([subjectId])
+  @@index([isMostExpected])
 }
 
 model Bookmark {

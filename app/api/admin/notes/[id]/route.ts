@@ -50,7 +50,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     // Build model-specific data (PYQ has no contentType; Note has no examType)
     const noteAllowed = ['isPremium', 'isPublished', 'title', 'description', 'academicBranch', 'academicSemester', 'classYear', 'contentType']
-    const pyqAllowed  = ['isPremium', 'isPublished', 'title', 'description', 'academicBranch', 'academicSemester', 'classYear', 'examType']
+    const pyqAllowed  = ['isPremium', 'isPublished', 'title', 'description', 'academicBranch', 'academicSemester', 'classYear', 'examType', 'isMostExpected']
 
     const specificData: any = {}
     const allowedKeys = isNote ? noteAllowed : pyqAllowed
