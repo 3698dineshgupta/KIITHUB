@@ -8,7 +8,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   const where: any = {}
   if (search) where.OR = [{ name:{ contains:search,mode:'insensitive' } },{ email:{ contains:search,mode:'insensitive' } }]
   const [users, total] = await Promise.all([
-    prisma.user.findMany({ where, orderBy:{ createdAt:'desc' }, skip:(page-1)*LIMIT, take:LIMIT, select:{ id:true,name:true,email:true,role:true,membershipStatus:true,membershipExpiry:true,createdAt:true,_count:{ select:{ downloads:true } } } }),
+    prisma.user.findMany({ where, orderBy:{ createdAt:'desc' }, skip:(page-1)*LIMIT, take:LIMIT, select:{ id:true,name:true,email:true,role:true,membershipStatus:true,membershipExpiry:true,createdAt:true,lastActiveAt:true,totalTimeSpentSec:true,_count:{ select:{ downloads:true } } } }),
     prisma.user.count({ where }),
   ])
   return (

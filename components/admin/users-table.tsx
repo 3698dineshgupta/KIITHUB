@@ -5,8 +5,8 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Crown, Shield, UserX, Search, Loader2, Download } from 'lucide-react'
-import { formatDate, daysLeft, isPremiumActive } from '@/lib/utils'
+import { Crown, Shield, UserX, Search, Loader2, Download, Timer } from 'lucide-react'
+import { formatDate, formatRelativeTime, formatDuration, daysLeft, isPremiumActive, isOnline } from '@/lib/utils'
 
 export function AdminUsersTable({ users, total, page }: { users: any[]; total: number; page: number }) {
   const router = useRouter()
@@ -44,8 +44,16 @@ export function AdminUsersTable({ users, total, page }: { users: any[]; total: n
             <Card key={user.id} className="p-4">
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">
-                    {user.name[0]}
+                  <div className="relative flex-shrink-0">
+                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                      {user.name[0]}
+                    </div>
+                    {isOnline(user.lastActiveAt) && (
+                      <span className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500 ring-2 ring-background" />
+                      </span>
+                    )}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
@@ -54,7 +62,12 @@ export function AdminUsersTable({ users, total, page }: { users: any[]; total: n
                       {premium && <Badge variant="premium" className="text-xs gap-1"><Crown className="h-3 w-3"/>Premium {daysLeft(user.membershipExpiry)}d left</Badge>}
                       {user.membershipStatus === 'PENDING' && <Badge variant="warning" className="text-xs">Pending</Badge>}
                     </div>
-                    <p className="text-xs text-muted-foreground">{user.email} · Joined {formatDate(user.createdAt)} · {user._count.downloads} downloads</p>
+                    <p className="text-xs text-muted-foreground">
+                      {user.email} · Joined {formatDate(user.createdAt)} · {user._count.downloads} downloads
+                      {' · '}
+                      {isOnline(user.lastActiveAt) ? <span className="text-green-600 font-medium">Online now</span> : user.lastActiveAt ? `Active ${formatRelativeTime(user.lastActiveAt)}` : 'Never active'}
+                      {user.totalTimeSpentSec > 0 && <span className="inline-flex items-center gap-0.5 ml-1"><Timer className="h-3 w-3 inline" /> {formatDuration(user.totalTimeSpentSec)}</span>}
+                    </p>
                   </div>
                 </div>
                 <div className="flex gap-2">

@@ -7,6 +7,7 @@ import { Footer } from '@/components/layout/footer'
 import { JsonLd, SITE_URL, SITE_NAME } from '@/components/seo/json-ld'
 import { DocumentLoadingOverlay } from '@/components/pdf/document-loading-overlay'
 import { ReportBugDialog } from '@/components/bugs/report-bug-dialog'
+import { PresenceHeartbeat } from '@/components/presence/presence-heartbeat'
 
 const inter = Inter({ subsets: ['latin'], display: 'swap' })
 
@@ -79,6 +80,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Footer />
           <DocumentLoadingOverlay />
           <ReportBugDialog />
+          <PresenceHeartbeat />
         </Providers>
       </body>
     </html>

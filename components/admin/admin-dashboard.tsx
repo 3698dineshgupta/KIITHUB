@@ -2,14 +2,23 @@ import { prisma } from '@/lib/prisma'
 import { cache } from '@/lib/redis'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Users, BookOpen, FileText, Download, Crown, Clock, TrendingUp, Eye } from 'lucide-react'
+import { Users, BookOpen, FileText, Download, Crown, Clock, TrendingUp, Eye, Radio, Timer } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatRelativeTime, formatDuration } from '@/lib/utils'
+
+// Matches app/api/presence/heartbeat/route.ts's 30s beat interval: 3 missed
+// beats of slack for network jitter/backgrounding before reading "offline".
+const ONLINE_WINDOW_MS = 90_000
 
 async function getAnalytics() {
   const d7 = new Date(Date.now() - 7 * 86400000)
-  const [totalUsers, premiumUsers, totalNotes, totalPYQs, totalDownloads, pendingPayments, recentUsers, recentViews, topNotes, recentPayments] = await Promise.all([
+  const onlineSince = new Date(Date.now() - ONLINE_WINDOW_MS)
+  const [
+    totalUsers, premiumUsers, totalNotes, totalPYQs, totalDownloads, pendingPayments,
+    recentUsers, recentViews, topNotes, topPyqs, recentPayments,
+    onlineCount, onlineUsers, mostActiveUsers,
+  ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { membershipStatus: 'PREMIUM' } }),
     prisma.note.count({ where: { isPublished: true } }),
@@ -19,15 +28,29 @@ async function getAnalytics() {
     prisma.user.count({ where: { createdAt: { gte: d7 } } }),
     prisma.view.count({ where: { createdAt: { gte: d7 } } }),
     prisma.note.findMany({ where: { isPublished: true }, orderBy: { viewCount: 'desc' }, take: 5, include: { subject: true } }),
+    prisma.pYQ.findMany({ where: { isPublished: true }, orderBy: { viewCount: 'desc' }, take: 5, include: { subject: true } }),
     prisma.paymentRequest.findMany({ where: { status: 'PENDING' }, include: { user: { select: { name: true, email: true } } }, orderBy: { createdAt: 'desc' }, take: 5 }),
+    prisma.user.count({ where: { lastActiveAt: { gte: onlineSince } } }),
+    prisma.user.findMany({ where: { lastActiveAt: { gte: onlineSince } }, orderBy: { lastActiveAt: 'desc' }, take: 8, select: { id: true, name: true, email: true, role: true, lastActiveAt: true } }),
+    prisma.user.findMany({ where: { totalTimeSpentSec: { gt: 0 } }, orderBy: { totalTimeSpentSec: 'desc' }, take: 5, select: { id: true, name: true, email: true, totalTimeSpentSec: true } }),
   ])
-  return { totalUsers, premiumUsers, totalNotes, totalPYQs, totalDownloads, pendingPayments, recentUsers, recentViews, topNotes, recentPayments }
+
+  // Notes and PYQs are separate tables (separate viewCount columns), so
+  // "most visited document" needs both merged and re-ranked together rather
+  // than just showing notes.
+  const topDocuments = [
+    ...topNotes.map(n => ({ id: n.id, title: n.title, subject: n.subject.name, viewCount: n.viewCount, isPremium: n.isPremium, type: 'note' as const })),
+    ...topPyqs.map(p => ({ id: p.id, title: p.title, subject: p.subject.name, viewCount: p.viewCount, isPremium: p.isPremium, type: 'pyq' as const })),
+  ].sort((a, b) => b.viewCount - a.viewCount).slice(0, 5)
+
+  return { totalUsers, premiumUsers, totalNotes, totalPYQs, totalDownloads, pendingPayments, recentUsers, recentViews, topDocuments, recentPayments, onlineCount, onlineUsers, mostActiveUsers }
 }
 
 export async function AdminDashboard() {
   const a = await getAnalytics()
 
   const statCards = [
+    { label: 'Online Now', value: a.onlineCount, icon: Radio, color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/30', sub: 'Active in last 90s' },
     { label: 'Total Users', value: a.totalUsers, icon: Users, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30', sub: `+${a.recentUsers} this week` },
     { label: 'Premium Users', value: a.premiumUsers, icon: Crown, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/30', sub: `${a.totalUsers > 0 ? ((a.premiumUsers / a.totalUsers) * 100).toFixed(1) : 0}% conversion` },
     { label: 'Notes', value: a.totalNotes, icon: BookOpen, color: 'text-emerald-600', bg: 'bg-emerald-100 dark:bg-emerald-900/30', sub: 'Published' },
@@ -64,30 +87,93 @@ export async function AdminDashboard() {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Top Notes */}
+        {/* Most Visited Documents (notes + PYQs merged) */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center justify-between">
-              Top Notes by Views
+              Most Visited Documents
               <Link href="/admin/notes"><Button variant="ghost" size="sm">View all</Button></Link>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {a.topNotes.map((note, i) => (
-                <div key={note.id} className="flex items-center gap-3">
+              {a.topDocuments.map((doc, i) => (
+                <div key={`${doc.type}-${doc.id}`} className="flex items-center gap-3">
                   <span className="text-2xl font-bold text-muted-foreground/30 w-8">#{i + 1}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{note.title}</p>
-                    <p className="text-xs text-muted-foreground">{note.subject.name}</p>
+                    <p className="text-sm font-medium truncate">{doc.title}</p>
+                    <p className="text-xs text-muted-foreground">{doc.subject} · {doc.type === 'note' ? 'Note' : 'PYQ'}</p>
                   </div>
                   <div className="text-right text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1"><Eye className="h-3 w-3" />{note.viewCount}</div>
-                    {note.isPremium && <Badge variant="premium" className="text-[10px]">PRO</Badge>}
+                    <div className="flex items-center gap-1"><Eye className="h-3 w-3" />{doc.viewCount}</div>
+                    {doc.isPremium && <Badge variant="premium" className="text-[10px]">PRO</Badge>}
                   </div>
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Online Now */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center justify-between">
+              Online Now
+              <Link href="/admin/users"><Button variant="ghost" size="sm">All users</Button></Link>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {a.onlineUsers.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No one online right now</p>
+            ) : (
+              <div className="space-y-3">
+                {a.onlineUsers.map(user => (
+                  <div key={user.id} className="flex items-center gap-3">
+                    <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                        {user.name}
+                        {user.role === 'ADMIN' && <Badge variant="default" className="text-[10px]">Admin</Badge>}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                    </div>
+                    <span className="text-xs text-muted-foreground flex-shrink-0">{formatRelativeTime(user.lastActiveAt!)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* Most Active Users by time spent */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Most Active Users</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {a.mostActiveUsers.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No activity recorded yet</p>
+            ) : (
+              <div className="space-y-3">
+                {a.mostActiveUsers.map((user, i) => (
+                  <div key={user.id} className="flex items-center gap-3">
+                    <span className="text-2xl font-bold text-muted-foreground/30 w-8">#{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{user.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                    </div>
+                    <div className="text-right text-xs text-muted-foreground flex items-center gap-1 flex-shrink-0">
+                      <Timer className="h-3 w-3" />{formatDuration(user.totalTimeSpentSec)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 

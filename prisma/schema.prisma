@@ -127,6 +127,16 @@ model User {
   membershipStatus   MembershipStatus @default(FREE)
   membershipExpiry   DateTime?
   isBanned           Boolean          @default(false)
+  // Bumped by the client-side presence heartbeat (every ~30s while a tab is
+  // visible) — never by ordinary page requests, so a user with an idle
+  // background tab doesn't read as "online". "Online now" is derived at
+  // query time as lastActiveAt within the last ~90s (3 missed beats of
+  // slack for network jitter), not stored as its own boolean.
+  lastActiveAt       DateTime?
+  // Incremented by a fixed 30s per accepted heartbeat rather than measured
+  // wall-clock gaps — immune to clock skew and to a resumed/reopened tab
+  // counting the hours it was closed as "time spent".
+  totalTimeSpentSec  Int              @default(0)
   // @default(cuid()) exists so NextAuth's PrismaAdapter — which creates
   // Google sign-in users directly via prisma.user.create() and has no idea
   // this column exists — never violates the NOT NULL/unique constraint.
@@ -159,6 +169,7 @@ model User {
   @@index([membershipStatus])
   @@index([referralCode])
   @@index([referredById])
+  @@index([lastActiveAt])
 }
 
 model Account {
