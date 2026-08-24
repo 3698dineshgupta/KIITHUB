@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
-import { Crown, Sparkles, Inbox, ExternalLink } from 'lucide-react'
+import { Crown, Sparkles, Inbox, ExternalLink, CheckCircle2 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { SubmissionUploadForm } from './submission-upload-form'
 import { UPLOAD_REWARD_THRESHOLD } from '@/lib/upload-reward-constants'
@@ -30,6 +30,7 @@ interface RewardStatus {
   approvedCount: number
   uploadsNeeded: number
   active: boolean
+  everGranted: boolean
   creditsRemaining: number
   expiresAt: string | null
 }
@@ -58,11 +59,12 @@ export function UploadEarnHub() {
   return (
     <div className="space-y-8">
       {reward && (
-        <Card className={reward.active
+        <Card className={reward.active && reward.creditsRemaining > 0
           ? 'p-6 border-amber-300 dark:border-amber-700 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30'
           : 'p-6 bg-muted/30'
         }>
-          {reward.active ? (
+          {reward.active && reward.creditsRemaining > 0 ? (
+            // Earned it, and there's still something to spend.
             <div className="flex items-start gap-4">
               <div className="p-3 rounded-full bg-amber-100 dark:bg-amber-900/30 flex-shrink-0">
                 <Crown className="h-6 w-6 text-amber-600" />
@@ -75,7 +77,36 @@ export function UploadEarnHub() {
                 </p>
               </div>
             </div>
+          ) : reward.active && reward.creditsRemaining === 0 ? (
+            // Earned it, window's still open, but both credits are already
+            // spent — distinct from "never earned" so this doesn't read as
+            // the reward having failed to apply.
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex-shrink-0">
+                <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg mb-1">You've used both of your premium document unlocks</h3>
+                <p className="text-sm text-muted-foreground">
+                  Thanks for contributing! Both documents you opened stay unlocked
+                  {reward.expiresAt && ` until they re-lock on ${formatDate(reward.expiresAt)}`}.
+                </p>
+              </div>
+            </div>
+          ) : reward.everGranted ? (
+            // Earned it once, window has since closed — a one-time reward,
+            // so this doesn't loop back into "upload more to earn it".
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-full bg-muted flex-shrink-0">
+                <Crown className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg mb-1">Your premium reward window has ended</h3>
+                <p className="text-sm text-muted-foreground">Thanks for contributing to KIIT Hub — your 15-day premium access period has closed.</p>
+              </div>
+            </div>
           ) : (
+            // Never earned it yet.
             <div className="flex items-start gap-4">
               <div className="p-3 rounded-full bg-muted flex-shrink-0">
                 <Sparkles className="h-6 w-6 text-muted-foreground" />

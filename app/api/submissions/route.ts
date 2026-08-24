@@ -166,6 +166,10 @@ export async function GET() {
         approvedCount,
         uploadsNeeded: Math.max(0, UPLOAD_REWARD_THRESHOLD - approvedCount),
         active: rewardActive,
+        // Distinguishes "never earned the reward" from "earned it, window
+        // has since closed" — active alone can't tell those apart, and the
+        // UI shows a different message for each.
+        everGranted: !!user?.uploadRewardGrantedAt,
         creditsRemaining: rewardActive ? (user?.uploadPremiumCredits ?? 0) : 0,
         expiresAt: rewardActive && user?.uploadRewardGrantedAt ? uploadRewardExpiresAt(user.uploadRewardGrantedAt) : null,
       },
