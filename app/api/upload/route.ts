@@ -7,6 +7,7 @@ import { supabaseUpload } from '@/lib/supabase'
 import { compressPdf } from '@/lib/ilovepdf'
 import { cache, CACHE_KEYS } from '@/lib/redis'
 import { slugify } from '@/lib/utils'
+import { computeFileHash } from '@/lib/duplicate-detection'
 import { z } from 'zod'
 
 // Allow up to 50 MB for PDF uploads
@@ -142,6 +143,10 @@ export async function POST(req: NextRequest) {
     const supabaseBucket = settingsMap.supabase_bucket || 'documents'
 
     let buffer: Buffer = Buffer.from(await file.arrayBuffer())
+    // Hashed before compression, same reasoning as app/api/submissions/route.ts
+    // — so this and a student-submitted duplicate of the same source PDF
+    // hash identically regardless of which one got compressed differently.
+    const fileHash = computeFileHash(buffer)
     let fileId = ''
     let msgId = ''
     let fileSize = 0
@@ -213,6 +218,7 @@ export async function POST(req: NextRequest) {
           telegramFileId: fileId,
           telegramMsgId: msgId,
           fileSize: fileSize,
+          fileHash,
           uploadedById: user.id,
         },
       })
@@ -244,6 +250,7 @@ export async function POST(req: NextRequest) {
         telegramFileId: fileId,
         telegramMsgId: msgId,
         fileSize: fileSize,
+        fileHash,
         uploadedById: user.id,
         ...(meta.tags?.length ? { tags: { create: meta.tags.map(t => ({ tag: t.toLowerCase().trim() })) } } : {}),
       },

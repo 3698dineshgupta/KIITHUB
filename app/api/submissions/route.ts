@@ -6,6 +6,7 @@ import { compressPdf } from '@/lib/ilovepdf'
 import { sendSubmissionForApproval, formatSubmissionCaption } from '@/lib/telegram-submissions'
 import { checkRateLimit } from '@/lib/ratelimit'
 import { isUploadRewardActive, uploadRewardExpiresAt, UPLOAD_REWARD_THRESHOLD } from '@/lib/upload-reward'
+import { computeFileHash, findDuplicateWarning } from '@/lib/duplicate-detection'
 
 export const config = { api: { bodyParser: false, sizeLimit: '52mb' } }
 export const maxDuration = 60
@@ -55,20 +56,42 @@ export async function POST(req: NextRequest) {
 
     const meta = metaSchema.parse(JSON.parse(metaRaw))
 
-    let buffer: Buffer = Buffer.from(await file.arrayBuffer())
-    if (buffer.length > TELEGRAM_SAFE_LIMIT) {
-      let compressed
-      try {
-        compressed = await compressPdf(buffer, file.name)
-      } catch (err) {
-        console.error('submission compression error:', err)
-        return NextResponse.json({ success: false, error: `File is ${(buffer.length / 1024 / 1024).toFixed(1)} MB and compression failed. Try a smaller file.`, code: 413 }, { status: 413 })
+    const originalBuffer: Buffer = Buffer.from(await file.arrayBuffer())
+    // Hashed before compression: compression output isn't guaranteed
+    // byte-identical across runs even for the same source PDF, so hashing
+    // post-compression would make the same original file re-uploaded twice
+    // look like two different documents and defeat exact-duplicate detection.
+    const fileHash = computeFileHash(originalBuffer)
+
+    // Every student upload gets run through iLovePDF, not just ones over the
+    // Telegram size ceiling — phone-scanned PDFs are routinely bloated well
+    // under that ceiling too, and compressing unconditionally keeps every
+    // submission small and fast to hand off to Telegram. A compression
+    // failure only blocks the upload if the original was too large to send
+    // uncompressed anyway; otherwise it falls back to the original bytes.
+    let buffer: Buffer = originalBuffer
+    try {
+      const compressed = await compressPdf(originalBuffer, file.name)
+      if (compressed.compressedSize < originalBuffer.length) buffer = compressed.buffer
+    } catch (err) {
+      console.error('submission compression error (falling back to original):', err)
+      if (originalBuffer.length > TELEGRAM_SAFE_LIMIT) {
+        return NextResponse.json({ success: false, error: `File is ${(originalBuffer.length / 1024 / 1024).toFixed(1)} MB and compression failed. Try a smaller file.`, code: 413 }, { status: 413 })
       }
-      if (compressed.compressedSize > TELEGRAM_SAFE_LIMIT) {
-        return NextResponse.json({ success: false, error: `Compressed from ${(compressed.originalSize / 1024 / 1024).toFixed(1)} MB to ${(compressed.compressedSize / 1024 / 1024).toFixed(1)} MB, still too large. Try compressing it further before uploading.`, code: 413 }, { status: 413 })
-      }
-      buffer = compressed.buffer
     }
+    if (buffer.length > TELEGRAM_SAFE_LIMIT) {
+      return NextResponse.json({ success: false, error: `Compressed from ${(originalBuffer.length / 1024 / 1024).toFixed(1)} MB to ${(buffer.length / 1024 / 1024).toFixed(1)} MB, still too large. Try compressing it further before uploading.`, code: 413 }, { status: 413 })
+    }
+
+    const duplicateNote = await findDuplicateWarning({
+      fileHash,
+      title: meta.title,
+      subjectName: meta.subjectName,
+      academicBranch: meta.academicBranch,
+      academicSemester: meta.academicSemester,
+      contentType: meta.contentType,
+      examType: meta.examType,
+    }).catch(err => { console.error('duplicate check failed (non-blocking):', err); return null })
 
     // Created first so the Telegram caption can include a real submission ID
     // for the callback buttons — updated with the Telegram result right after.
@@ -86,10 +109,12 @@ export async function POST(req: NextRequest) {
         telegramFileId: '',
         telegramMsgId: '',
         fileSize: buffer.length,
+        fileHash,
+        duplicateNote,
       },
     })
 
-    const caption = formatSubmissionCaption({ ...submission, uploader: user }, undefined)
+    const caption = formatSubmissionCaption({ ...submission, uploader: user }, duplicateNote ? `⚠️ POSSIBLE DUPLICATE\n${duplicateNote}` : undefined)
     const tgResult = await sendSubmissionForApproval({ submissionId: submission.id, buffer, fileName: file.name, caption })
 
     if (tgResult.ok) {

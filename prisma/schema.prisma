@@ -313,11 +313,16 @@ model Note {
   academicBranch   String?
   academicSemester String?
   classYear        String?
+  // SHA-256 of the raw uploaded bytes, before compression — see
+  // lib/duplicate-detection.ts. Nullable: rows created before this field
+  // existed have no hash and are simply never matched by it.
+  fileHash         String?
 
   @@index([subjectId])
   @@index([branchId, semesterId])
   @@index([isPremium])
   @@index([viewCount])
+  @@index([fileHash])
 }
 
 model NoteTag {
@@ -362,10 +367,14 @@ model PYQ {
   // Curated by an admin/moderator, not derived from the title — a paper
   // predicting likely exam questions, distinct from an actual past paper.
   isMostExpected   Boolean    @default(false)
+  // SHA-256 of the raw uploaded bytes, before compression — see
+  // lib/duplicate-detection.ts.
+  fileHash         String?
 
   @@index([year])
   @@index([branchId, semesterId])
   @@index([subjectId])
+  @@index([fileHash])
   @@index([isMostExpected])
 }
 
@@ -695,6 +704,17 @@ model ContentSubmission {
   telegramFileId     String
   telegramMsgId      String
   fileSize           Int?
+  // SHA-256 of the raw uploaded bytes, before compression — computed once
+  // at submission time and carried onto the published Note/PYQ on approval
+  // (see lib/duplicate-detection.ts, approveSubmission in
+  // lib/submission-moderation.ts).
+  fileHash           String?
+  // Populated at submission time by lib/duplicate-detection.ts — a
+  // human-readable heads-up for the reviewer (exact file match, or a
+  // same-subject/branch/semester title match against existing content).
+  // Purely informational: never blocks or auto-rejects a submission, the
+  // admin decides.
+  duplicateNote      String?
   status             SubmissionStatus @default(PENDING)
   rejectionReason    String?
   // Set once approved — where the resulting live document actually lives.
@@ -713,6 +733,7 @@ model ContentSubmission {
 
   @@index([userId])
   @@index([status])
+  @@index([fileHash])
 }
 
 // One row per (user, document) the upload reward has unlocked — the actual

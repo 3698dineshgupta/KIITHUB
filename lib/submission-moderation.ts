@@ -60,6 +60,7 @@ export async function approveSubmission(submissionId: string, adminId: string | 
         telegramFileId: submission.telegramFileId,
         telegramMsgId: submission.telegramMsgId,
         fileSize: submission.fileSize,
+        fileHash: submission.fileHash,
         uploadedById: submission.userId,
       },
     })
@@ -83,6 +84,7 @@ export async function approveSubmission(submissionId: string, adminId: string | 
         telegramFileId: submission.telegramFileId,
         telegramMsgId: submission.telegramMsgId,
         fileSize: submission.fileSize,
+        fileHash: submission.fileHash,
         uploadedById: submission.userId,
       },
     })
