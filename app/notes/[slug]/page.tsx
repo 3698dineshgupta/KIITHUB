@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { signStreamToken } from '@/lib/jwt'
 import { isPremiumActive } from '@/lib/utils'
+import { canAccessPremiumDoc, tryConsumeUploadRewardCredit } from '@/lib/upload-reward'
 import { PremiumGate } from '@/components/pdf/premium-gate'
 import { CloseDocumentLoader } from '@/components/pdf/close-document-loader'
 import { NoteMetaCard } from '@/components/notes/note-meta-card'
@@ -66,8 +67,19 @@ export default async function NoteViewPage({ params }: { params: Promise<{ slug:
     : null
   const userIsPremium = user ? isPremiumActive(user.membershipStatus, user.membershipExpiry) : false
 
+  // Non-premium users who earned upload-reward credits (see
+  // lib/upload-reward.ts) get in too — this is the one call site allowed to
+  // actually spend a credit, since force-dynamic keeps Next.js Link
+  // prefetching from ever executing this page body on mere hover, so this
+  // genuinely only runs for a real page load.
+  let canView = userIsPremium
+  if (note.isPremium && !userIsPremium && user) {
+    canView = await canAccessPremiumDoc(user, 'note', note.id)
+    if (canView) await tryConsumeUploadRewardCredit(user.id, 'note', note.id).catch(() => {})
+  }
+
   // If premium note and no access → show gate
-  if (note.isPremium && !userIsPremium) {
+  if (note.isPremium && !canView) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-8">
         <JsonLd data={breadcrumb} />

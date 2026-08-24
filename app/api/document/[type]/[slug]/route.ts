@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { isPremiumActive } from '@/lib/utils'
 import { signStreamToken } from '@/lib/jwt'
 import { getSuggestions } from '@/lib/recommendations'
+import { canAccessPremiumDoc } from '@/lib/upload-reward'
 
 // Side-effect-free by design (no view recording, no write of any kind) so the
 // document viewer can call this liberally for background prefetch of
@@ -34,7 +35,11 @@ export async function GET(
     if (!user) return NextResponse.json({ error: 'Sign in required' }, { status: 401 })
 
     const userIsPremium = isPremiumActive(user.membershipStatus, user.membershipExpiry)
-    if (doc.isPremium && !userIsPremium) {
+    // Read-only eligibility check (never consumes a credit) — this route is
+    // hit by the background prefetch effect in document-viewer-shell.tsx for
+    // adjacent documents the reader may never actually open, so it must
+    // never be where a credit gets spent. See lib/upload-reward.ts.
+    if (doc.isPremium && !userIsPremium && !(await canAccessPremiumDoc(user, type, doc.id))) {
       return NextResponse.json(
         { error: 'Premium required', premiumGate: true, type, slug: doc.slug, title: doc.title },
         { status: 403 }

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, FileText, Upload, Users, CreditCard,
-  Settings, BookOpen, ChevronRight, Shield, ShoppingBag, Gift, Bug, Inbox, Mail,
+  Settings, BookOpen, ChevronRight, Shield, ShoppingBag, Gift, Bug, Inbox, Mail, UploadCloud,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -16,6 +16,7 @@ const items = [
   { href: '/admin/merchandise', label: 'Merchandise', icon: ShoppingBag },
   { href: '/admin/referrals', label: 'Referrals', icon: Gift },
   { href: '/admin/requests', label: 'Request Hub', icon: Inbox },
+  { href: '/admin/submissions', label: 'Student Uploads', icon: UploadCloud },
   { href: '/admin/contact', label: 'Contact Messages', icon: Mail },
   { href: '/admin/bugs', label: 'Bug Reports', icon: Bug },
   { href: '/admin/settings', label: 'Settings', icon: Settings },

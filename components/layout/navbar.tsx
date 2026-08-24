@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import { useTheme } from 'next-themes'
 import { motion, AnimatePresence } from 'framer-motion'
-import { BookOpen, FileText, Calculator, Crown, Menu, X, Sun, Moon, LogOut, User, LayoutDashboard, ChevronDown, Shield, ShoppingBag, Bug, Inbox, ArrowRight } from 'lucide-react'
+import { BookOpen, FileText, Calculator, Crown, Menu, X, Sun, Moon, LogOut, User, LayoutDashboard, ChevronDown, Shield, ShoppingBag, Bug, Inbox, ArrowRight, UploadCloud } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn, isPremiumActive } from '@/lib/utils'
@@ -22,6 +22,7 @@ const accountLinksBase = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, chip: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' },
   { href: '/profile', label: 'Profile', icon: User, chip: 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400' },
   { href: '/requests', label: 'Request Hub', icon: Inbox, chip: 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' },
+  { href: '/upload-earn', label: 'Upload & Earn Premium', icon: UploadCloud, chip: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' },
   { href: '/merchandise/my-listings', label: 'My Listings', icon: ShoppingBag, chip: 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' },
   { href: '/my-reports', label: 'My Reports', icon: Bug, chip: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' },
 ]

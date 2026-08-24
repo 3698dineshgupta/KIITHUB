@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyStreamToken } from '@/lib/jwt'
 import { prisma } from '@/lib/prisma'
-import { isPremiumActive } from '@/lib/utils'
 import { buildPdfResponse } from '@/lib/pdf-stream'
+import { canAccessPremiumDoc } from '@/lib/upload-reward'
 
 const devTiming = process.env.NODE_ENV !== 'production'
 
@@ -36,8 +36,12 @@ export async function GET(
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 403 })
     if (!note || !note.isPublished) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    const userIsPremium = isPremiumActive(user.membershipStatus, user.membershipExpiry)
-    if (note.isPremium && !userIsPremium) {
+    // Read-only check — every pdf.js byte-range request (and background
+    // warm-prefetch) hits this route, so it must never be the place a
+    // credit gets spent (see lib/upload-reward.ts). By the time a valid
+    // signed token exists, access was already decided (and any credit
+    // already consumed) upstream in the page load / /view POST.
+    if (note.isPremium && !(await canAccessPremiumDoc(user, 'note', note.id))) {
       return NextResponse.json({ error: 'Premium required' }, { status: 403 })
     }
 

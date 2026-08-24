@@ -54,6 +54,15 @@ enum NotificationType {
   REQUEST_RECEIVED
   REQUEST_STATUS_CHANGED
   REQUEST_FULFILLED
+  SUBMISSION_APPROVED
+  SUBMISSION_REJECTED
+  UPLOAD_REWARD_GRANTED
+}
+
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum RequestStatus {
@@ -147,6 +156,16 @@ model User {
   // wall-clock gaps — immune to clock skew and to a resumed/reopened tab
   // counting the hours it was closed as "time spent".
   totalTimeSpentSec  Int              @default(0)
+  // Set once, the first time a user reaches 3 APPROVED ContentSubmissions —
+  // never reset or re-granted on later uploads (one-time reward). Null means
+  // never earned. The 15-day access window is computed from this timestamp,
+  // not stored separately.
+  uploadRewardGrantedAt DateTime?
+  // Remaining premium-document unlocks from the upload reward. Starts at 2
+  // when the reward is granted, decremented by tryConsumeUploadRewardCredit
+  // (lib/upload-reward.ts) the first time each distinct premium document is
+  // opened — reopening an already-unlocked document never costs another.
+  uploadPremiumCredits  Int              @default(0)
   // @default(cuid()) exists so NextAuth's PrismaAdapter — which creates
   // Google sign-in users directly via prisma.user.create() and has no idea
   // this column exists — never violates the NOT NULL/unique constraint.
@@ -176,6 +195,8 @@ model User {
   bugComments        BugComment[]
   contentRequests    ContentRequest[]
   contactMessages    ContactMessage[]
+  contentSubmissions ContentSubmission[]
+  uploadRewardUnlocks UploadRewardUnlock[]
 
   @@index([email])
   @@index([membershipStatus])
@@ -651,4 +672,63 @@ model ContactMessage {
 
   @@index([respondedAt])
   @@index([createdAt])
+}
+
+// A student-submitted Note/PYQ awaiting Telegram-based admin review — see
+// lib/telegram-submissions.ts / lib/submission-moderation.ts. On approval, a
+// real Note or PYQ row is created from this data (publishedType/
+// publishedSlug then point at it) and lib/upload-reward.ts checks whether
+// this pushed the uploader's approved-submission count to the reward
+// threshold.
+model ContentSubmission {
+  id                 String           @id @default(cuid())
+  userId             String
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title              String
+  description        String?
+  contentType        ContentType      @default(NOTE)
+  examType           String?
+  academicBranch     String
+  academicSemester   String
+  classYear          String
+  subjectName        String
+  telegramFileId     String
+  telegramMsgId      String
+  fileSize           Int?
+  status             SubmissionStatus @default(PENDING)
+  rejectionReason    String?
+  // Set once approved — where the resulting live document actually lives.
+  publishedType      String?
+  publishedSlug      String?
+  telegramSent       Boolean          @default(false)
+  telegramMessageId  Int?
+  telegramError      String?
+  // Mirrors MerchListing's awaitingCustomReason: set when an admin picks
+  // "Other" on the Telegram reject-reason menu, so the next text reply to
+  // that message is understood as the custom reason rather than an
+  // unrelated message.
+  awaitingCustomReason Boolean        @default(false)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// One row per (user, document) the upload reward has unlocked — the actual
+// "has this specific document already been paid for with a credit" record.
+// Existence of a row means no further credit is charged on repeat opens
+// within the active window; expiry (15 days from
+// User.uploadRewardGrantedAt) is checked at read time, not by deleting rows.
+model UploadRewardUnlock {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  noteId    String?
+  pyqId     String?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, noteId])
+  @@unique([userId, pyqId])
+  @@index([userId])
 }

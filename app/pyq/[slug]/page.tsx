@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { signStreamToken } from '@/lib/jwt'
 import { isPremiumActive } from '@/lib/utils'
+import { canAccessPremiumDoc, tryConsumeUploadRewardCredit } from '@/lib/upload-reward'
 import { PremiumGate } from '@/components/pdf/premium-gate'
 import { CloseDocumentLoader } from '@/components/pdf/close-document-loader'
 import { NoteMetaCard } from '@/components/notes/note-meta-card'
@@ -25,6 +26,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 const devTiming = process.env.NODE_ENV !== 'production'
 
+// Explicit alongside the notes page's identical declaration — both already
+// opt into per-request dynamic rendering just by calling auth(), but this
+// page's premium gate now also spends an upload-reward credit (see
+// lib/upload-reward.ts), so it matters that Next.js's Link prefetching can
+// never execute this body speculatively on hover.
+export const dynamic = "force-dynamic";
 export default async function PYQViewPage({ params }: { params: Promise<{ slug: string }> }) {
   const t0 = devTiming ? performance.now() : 0
   const { slug } = await params
@@ -53,7 +60,13 @@ export default async function PYQViewPage({ params }: { params: Promise<{ slug: 
     educationalLevel: 'University',
     about: pyq.subject.name,
   }
-  if (pyq.isPremium && !userIsPremium) {
+  let canView = userIsPremium
+  if (pyq.isPremium && !userIsPremium && user) {
+    canView = await canAccessPremiumDoc(user, 'pyq', pyq.id)
+    if (canView) await tryConsumeUploadRewardCredit(user.id, 'pyq', pyq.id).catch(() => {})
+  }
+
+  if (pyq.isPremium && !canView) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
         <JsonLd data={breadcrumb} />

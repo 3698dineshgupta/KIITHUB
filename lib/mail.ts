@@ -130,3 +130,18 @@ export async function sendContactConfirmationEmail(to: string, name?: string) {
     `,
   })
 }
+
+export async function sendUploadRewardGrantedEmail(to: string, name: string, credits: number, windowDays: number, expiresAt: Date) {
+  return sendMail({
+    to,
+    subject: `You earned ${credits} premium documents on KIIT Hub!`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2>Hi ${escapeHtml(name)},</h2>
+        <p>Thanks for contributing notes and PYQs to KIIT Hub — you've unlocked <strong>${credits} premium documents</strong>, free to view for the next <strong>${windowDays} days</strong> (until ${expiresAt.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}).</p>
+        <p>Just open any premium note or PYQ as usual — access is applied automatically, no code needed.</p>
+        <p style="margin-top:24px;color:#666;font-size:13px">— Team KIIT Hub</p>
+      </div>
+    `,
+  })
+}

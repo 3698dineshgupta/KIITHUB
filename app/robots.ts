@@ -22,6 +22,7 @@ export default function robots(): MetadataRoute.Robots {
         '/merchandise/my-listings',
         '/requests',
         '/my-reports',
+        '/upload-earn',
       ],
     },
     sitemap: `${baseUrl}/sitemap.xml`,

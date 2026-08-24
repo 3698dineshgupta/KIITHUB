@@ -17,7 +17,7 @@ export function Footer() {
             <p className="text-sm text-muted-foreground leading-relaxed">Free & premium study materials for KIIT students. Notes, PYQs, and more.</p>
           </div>
           {[
-            { title: 'Resources', links: [{ href:'/notes', label:'Notes' },{ href:'/pyq', label:'PYQs' },{ href:'/calculator', label:'SGPA/CGPA' },{ href:'/premium', label:'Premium' },{ href:'/requests', label:'Request Hub' }] },
+            { title: 'Resources', links: [{ href:'/notes', label:'Notes' },{ href:'/pyq', label:'PYQs' },{ href:'/calculator', label:'SGPA/CGPA' },{ href:'/premium', label:'Premium' },{ href:'/requests', label:'Request Hub' },{ href:'/upload-earn', label:'Upload & Earn Premium' }] },
             { title: 'Platform', links: [{ href:'/dashboard', label:'Dashboard' },{ href:'/register', label:'Sign Up' },{ href:'/login', label:'Login' },{ href:'/profile', label:'Refer & Earn Premium' },{ href:'/help', label:'Help & Support' },{ href:'/contact', label:'Contact Us' }] },
             { title: 'Legal', links: [{ href:'/privacy', label:'Privacy Policy' },{ href:'/terms', label:'Terms of Service' }] },
           ].map(col => (

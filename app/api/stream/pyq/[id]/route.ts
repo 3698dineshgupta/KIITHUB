@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyStreamToken } from '@/lib/jwt'
 import { prisma } from '@/lib/prisma'
-import { isPremiumActive } from '@/lib/utils'
 import { buildPdfResponse } from '@/lib/pdf-stream'
+import { canAccessPremiumDoc } from '@/lib/upload-reward'
 
 const devTiming = process.env.NODE_ENV !== 'production'
 
@@ -33,8 +33,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 403 })
     if (!pyq || !pyq.isPublished) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    const userIsPremium = isPremiumActive(user.membershipStatus, user.membershipExpiry)
-    if (pyq.isPremium && !userIsPremium) {
+    // Read-only — see the identical comment in stream/note/[id]/route.ts.
+    if (pyq.isPremium && !(await canAccessPremiumDoc(user, 'pyq', pyq.id))) {
       return NextResponse.json({ error: 'Premium required' }, { status: 403 })
     }
 

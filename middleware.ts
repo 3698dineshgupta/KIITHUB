@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 
-const PROTECTED = ['/dashboard', '/profile', '/admin', '/merchandise/sell', '/merchandise/my-listings', '/my-reports', '/requests']
+const PROTECTED = ['/dashboard', '/profile', '/admin', '/merchandise/sell', '/merchandise/my-listings', '/my-reports', '/requests', '/upload-earn']
 
 export default auth((req) => {
   const { pathname } = req.nextUrl
