@@ -54,81 +54,96 @@ export async function POST(req: NextRequest) {
 
       const messageId = cq.message?.message_id
 
-      const parsed = parseListingCallback(cq.data || '')
-      if (parsed) {
-        switch (parsed.action) {
-          case 'approve': {
-            const result = await approveListing(parsed.listingId, String(fromId))
-            await answerCallback(cq.id, result.ok ? 'Listing approved ✅' : result.error, !result.ok)
-            break
-          }
-          case 'reject_menu': {
-            if (messageId) await editReplyMarkup(messageId, buildRejectReasonKeyboard(parsed.listingId))
-            await answerCallback(cq.id)
-            break
-          }
-          case 'back': {
-            if (messageId) await editReplyMarkup(messageId, buildApprovalKeyboard(parsed.listingId))
-            await answerCallback(cq.id)
-            break
-          }
-          case 'reject_reason': {
-            const reasonLabel = REJECT_REASONS.find(r => r.code === parsed.code)?.label ?? 'Not specified'
-            const result = await rejectListing(parsed.listingId, String(fromId), reasonLabel)
-            await answerCallback(cq.id, result.ok ? 'Listing rejected ❌' : result.error, !result.ok)
-            break
-          }
-          case 'reject_custom': {
-            await markAwaitingCustomReason(parsed.listingId)
-            if (messageId) {
-              await editListingMessage(messageId, `${cq.message?.caption || ''}\n\n✍️ Reply to this message with the rejection reason.`, undefined, true)
+      // Every branch below can throw (most commonly a transient DB blip —
+      // this session hit that repeatedly during development). Previously an
+      // exception here just fell through to the outer catch, which returns
+      // a bare 500 with no answerCallback at all — Telegram shows that as
+      // the button silently doing nothing (no toast, no error), completely
+      // indistinguishable from a client-side bug. Wrapping the dispatch
+      // itself means a failure now always surfaces as a visible Telegram
+      // alert instead of a mysterious dead button.
+      try {
+        const parsed = parseListingCallback(cq.data || '')
+        if (parsed) {
+          switch (parsed.action) {
+            case 'approve': {
+              const result = await approveListing(parsed.listingId, String(fromId))
+              await answerCallback(cq.id, result.ok ? 'Listing approved ✅' : result.error, !result.ok)
+              break
             }
-            await answerCallback(cq.id, 'Reply to this message with the rejection reason')
-            break
+            case 'reject_menu': {
+              if (messageId) await editReplyMarkup(messageId, buildRejectReasonKeyboard(parsed.listingId))
+              await answerCallback(cq.id)
+              break
+            }
+            case 'back': {
+              if (messageId) await editReplyMarkup(messageId, buildApprovalKeyboard(parsed.listingId))
+              await answerCallback(cq.id)
+              break
+            }
+            case 'reject_reason': {
+              const reasonLabel = REJECT_REASONS.find(r => r.code === parsed.code)?.label ?? 'Not specified'
+              const result = await rejectListing(parsed.listingId, String(fromId), reasonLabel)
+              await answerCallback(cq.id, result.ok ? 'Listing rejected ❌' : result.error, !result.ok)
+              break
+            }
+            case 'reject_custom': {
+              await markAwaitingCustomReason(parsed.listingId)
+              if (messageId) {
+                await editListingMessage(messageId, `${cq.message?.caption || ''}\n\n✍️ Reply to this message with the rejection reason.`, undefined, true)
+              }
+              await answerCallback(cq.id, 'Reply to this message with the rejection reason')
+              break
+            }
           }
+          return NextResponse.json({ ok: true })
         }
+
+        const parsedSubmission = parseSubmissionCallback(cq.data || '')
+        if (parsedSubmission) {
+          switch (parsedSubmission.action) {
+            case 'approve': {
+              const result = await approveSubmission(parsedSubmission.submissionId, String(fromId))
+              const rewardNote = result.ok && result.rewardGranted ? ' — uploader just earned their premium reward 🎉' : ''
+              await answerCallback(cq.id, result.ok ? `Upload approved ✅${rewardNote}` : result.error, !result.ok)
+              break
+            }
+            case 'reject_menu': {
+              if (messageId) await editSubmissionReplyMarkup(messageId, buildSubmissionRejectReasonKeyboard(parsedSubmission.submissionId))
+              await answerCallback(cq.id)
+              break
+            }
+            case 'back': {
+              if (messageId) await editSubmissionReplyMarkup(messageId, buildSubmissionApprovalKeyboard(parsedSubmission.submissionId))
+              await answerCallback(cq.id)
+              break
+            }
+            case 'reject_reason': {
+              const reasonLabel = SUBMISSION_REJECT_REASONS.find(r => r.code === parsedSubmission.code)?.label ?? 'Not specified'
+              const result = await rejectSubmission(parsedSubmission.submissionId, String(fromId), reasonLabel)
+              await answerCallback(cq.id, result.ok ? 'Upload rejected ❌' : result.error, !result.ok)
+              break
+            }
+            case 'reject_custom': {
+              await markSubmissionAwaitingCustomReason(parsedSubmission.submissionId)
+              if (messageId) {
+                await editSubmissionMessage(messageId, `${cq.message?.caption || ''}\n\n✍️ Reply to this message with the rejection reason.`)
+              }
+              await answerCallback(cq.id, 'Reply to this message with the rejection reason')
+              break
+            }
+          }
+          return NextResponse.json({ ok: true })
+        }
+
+        await answerCallback(cq.id)
+        return NextResponse.json({ ok: true })
+      } catch (actionErr) {
+        console.error('telegram callback action error:', actionErr)
+        const msg = actionErr instanceof Error ? actionErr.message : 'Unknown error'
+        await answerCallback(cq.id, `Action failed: ${msg.slice(0, 150)}`, true).catch(() => {})
         return NextResponse.json({ ok: true })
       }
-
-      const parsedSubmission = parseSubmissionCallback(cq.data || '')
-      if (parsedSubmission) {
-        switch (parsedSubmission.action) {
-          case 'approve': {
-            const result = await approveSubmission(parsedSubmission.submissionId, String(fromId))
-            const rewardNote = result.ok && result.rewardGranted ? ' — uploader just earned their premium reward 🎉' : ''
-            await answerCallback(cq.id, result.ok ? `Upload approved ✅${rewardNote}` : result.error, !result.ok)
-            break
-          }
-          case 'reject_menu': {
-            if (messageId) await editSubmissionReplyMarkup(messageId, buildSubmissionRejectReasonKeyboard(parsedSubmission.submissionId))
-            await answerCallback(cq.id)
-            break
-          }
-          case 'back': {
-            if (messageId) await editSubmissionReplyMarkup(messageId, buildSubmissionApprovalKeyboard(parsedSubmission.submissionId))
-            await answerCallback(cq.id)
-            break
-          }
-          case 'reject_reason': {
-            const reasonLabel = SUBMISSION_REJECT_REASONS.find(r => r.code === parsedSubmission.code)?.label ?? 'Not specified'
-            const result = await rejectSubmission(parsedSubmission.submissionId, String(fromId), reasonLabel)
-            await answerCallback(cq.id, result.ok ? 'Upload rejected ❌' : result.error, !result.ok)
-            break
-          }
-          case 'reject_custom': {
-            await markSubmissionAwaitingCustomReason(parsedSubmission.submissionId)
-            if (messageId) {
-              await editSubmissionMessage(messageId, `${cq.message?.caption || ''}\n\n✍️ Reply to this message with the rejection reason.`)
-            }
-            await answerCallback(cq.id, 'Reply to this message with the rejection reason')
-            break
-          }
-        }
-        return NextResponse.json({ ok: true })
-      }
-
-      await answerCallback(cq.id)
-      return NextResponse.json({ ok: true })
     }
 
     if (update.message?.reply_to_message && update.message.text) {
