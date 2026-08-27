@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useDebouncedParam } from '@/hooks/use-debounced-param'
+import { logSearch } from '@/lib/search-log-client'
 
 const CONTENT_TYPES = [
   { value: 'NOTE', label: 'Notes' },
@@ -40,7 +41,10 @@ export function NotesFilters({ branches, semesters, subjects }: Props) {
     [router, pathname, sp]
   )
 
-  const search = useDebouncedParam(sp.get('search') ?? '', v => updateParam('search', v || null))
+  const search = useDebouncedParam(sp.get('search') ?? '', v => {
+    updateParam('search', v || null)
+    logSearch(v, pathname.includes('/pyq') ? 'pyq' : 'notes')
+  })
 
   const clearAll = () => {
     search.reset('')

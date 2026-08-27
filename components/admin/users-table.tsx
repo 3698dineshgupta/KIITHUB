@@ -1,17 +1,22 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Crown, Shield, UserX, Search, Loader2, Download, Timer } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Crown, Shield, UserX, Search, Loader2, Download, Timer, Activity, Eye, ExternalLink } from 'lucide-react'
 import { formatDate, formatRelativeTime, formatDuration, daysLeft, isPremiumActive, isOnline } from '@/lib/utils'
+
+const PAGE_LABEL: Record<string, string> = { notes: 'Notes', pyq: 'PYQs', merchandise: 'Merchandise' }
 
 export function AdminUsersTable({ users, total, page }: { users: any[]; total: number; page: number }) {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState<string | null>(null)
+  const [activityUser, setActivityUser] = useState<{ id: string; name: string } | null>(null)
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -71,6 +76,9 @@ export function AdminUsersTable({ users, total, page }: { users: any[]; total: n
                   </div>
                 </div>
                 <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="text-xs h-8 gap-1" onClick={() => setActivityUser({ id: user.id, name: user.name })}>
+                    <Activity className="h-3 w-3" />Activity
+                  </Button>
                   {premium
                     ? <Button size="sm" variant="outline" disabled={!!loading} onClick={() => doAction(user.id, 'revoke_premium')} className="text-xs h-8">{loading === user.id+'revoke_premium' ? <Loader2 className="h-3 w-3 animate-spin"/> : 'Revoke Premium'}</Button>
                     : <Button size="sm" variant="premium" disabled={!!loading} onClick={() => doAction(user.id, 'grant_premium')} className="text-xs h-8 gap-1">{loading === user.id+'grant_premium' ? <Loader2 className="h-3 w-3 animate-spin"/> : <><Crown className="h-3 w-3"/>Grant Premium</>}</Button>
@@ -94,6 +102,83 @@ export function AdminUsersTable({ users, total, page }: { users: any[]; total: n
           {users.length === 20 && <Button variant="outline" size="sm" onClick={() => router.push(`/admin/users?page=${page+1}`)}>Next</Button>}
         </div>
       </div>
+
+      <UserActivityDialog user={activityUser} onClose={() => setActivityUser(null)} />
     </div>
+  )
+}
+
+interface ActivityView { id: string; type: 'note' | 'pyq'; title: string; slug: string | null; createdAt: string }
+interface ActivitySearch { id: string; query: string; page: string; createdAt: string }
+
+function UserActivityDialog({ user, onClose }: { user: { id: string; name: string } | null; onClose: () => void }) {
+  const [views, setViews] = useState<ActivityView[] | null>(null)
+  const [searches, setSearches] = useState<ActivitySearch[] | null>(null)
+
+  useEffect(() => {
+    if (!user) { setViews(null); setSearches(null); return }
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/admin/users/${user.id}/activity`, { cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          setViews(data.views)
+          setSearches(data.searches)
+        }
+      } catch {}
+    })()
+  }, [user])
+
+  return (
+    <Dialog open={!!user} onOpenChange={open => !open && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{user?.name}'s Activity</DialogTitle>
+        </DialogHeader>
+
+        <div className="grid sm:grid-cols-2 gap-6 text-sm">
+          <div>
+            <h3 className="font-medium mb-3 flex items-center gap-1.5"><Eye className="h-4 w-4 text-muted-foreground" />Recently Viewed</h3>
+            {views === null ? (
+              <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-10 bg-muted animate-pulse rounded-lg" />)}</div>
+            ) : views.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No documents viewed yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {views.map(v => (
+                  <div key={v.id} className="flex items-start justify-between gap-2 text-xs">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{v.title}</p>
+                      <p className="text-muted-foreground">{v.type === 'note' ? 'Note' : 'PYQ'} · {formatRelativeTime(v.createdAt)}</p>
+                    </div>
+                    {v.slug && (
+                      <Link href={`/${v.type}/${v.slug}`} target="_blank" className="text-primary flex-shrink-0 mt-0.5"><ExternalLink className="h-3 w-3" /></Link>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h3 className="font-medium mb-3 flex items-center gap-1.5"><Search className="h-4 w-4 text-muted-foreground" />Recently Searched</h3>
+            {searches === null ? (
+              <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-10 bg-muted animate-pulse rounded-lg" />)}</div>
+            ) : searches.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No searches logged yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {searches.map(s => (
+                  <div key={s.id} className="text-xs">
+                    <p className="font-medium">"{s.query}"</p>
+                    <p className="text-muted-foreground">{PAGE_LABEL[s.page] ?? s.page} · {formatRelativeTime(s.createdAt)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CATEGORY_OPTIONS, CONDITION_OPTIONS } from './merch-constants'
 import { useDebouncedParam } from '@/hooks/use-debounced-param'
+import { logSearch } from '@/lib/search-log-client'
 
 export function MerchandiseFilters() {
   const router = useRouter()
@@ -27,7 +28,10 @@ export function MerchandiseFilters() {
     [router, pathname, sp]
   )
 
-  const search = useDebouncedParam(sp.get('search') ?? '', v => updateParam('search', v || null))
+  const search = useDebouncedParam(sp.get('search') ?? '', v => {
+    updateParam('search', v || null)
+    logSearch(v, 'merchandise')
+  })
   const minPrice = useDebouncedParam(sp.get('minPrice') ?? '', v => updateParam('minPrice', v || null))
   const maxPrice = useDebouncedParam(sp.get('maxPrice') ?? '', v => updateParam('maxPrice', v || null))
 

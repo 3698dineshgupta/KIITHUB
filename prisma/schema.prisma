@@ -197,6 +197,7 @@ model User {
   contactMessages    ContactMessage[]
   contentSubmissions ContentSubmission[]
   uploadRewardUnlocks UploadRewardUnlock[]
+  searchLogs         SearchLog[]
 
   @@index([email])
   @@index([membershipStatus])
@@ -421,6 +422,24 @@ model View {
 
   @@index([noteId])
   @@index([pyqId])
+  @@index([createdAt])
+  @@index([userId])
+}
+
+// One row per debounced search commit (see hooks/use-debounced-param.ts and
+// the notes/merchandise filter bars) — logged client-side at the exact
+// moment a search actually fires, not on every keystroke or page
+// re-render, so this reflects genuine search intent. Powers the admin
+// per-user "recently viewed / recently searched" panel.
+model SearchLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  query     String
+  page      String
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
   @@index([createdAt])
 }
 
