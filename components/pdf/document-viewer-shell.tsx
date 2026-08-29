@@ -62,6 +62,18 @@ export function DocumentViewerShell({ initial }: DocumentViewerShellProps) {
   // Synchronous re-entry guard for goTo — see the comment inside it.
   const navLockRef = useRef(false)
 
+  // Frozen at mount to the very first document's suggestions — deliberately
+  // never recomputed as `current` changes. The "explore new material" arrow
+  // used to always grab `current.suggestions[0]`, a list re-derived fresh
+  // for whichever document just became current; the 2nd click's "[0]" has
+  // nothing to do with the 1st click's "[0]", so pressing the arrow
+  // repeatedly didn't walk 1st→2nd→3rd→4th at all — it could just as easily
+  // ping-pong between two documents that each rank the other as their own
+  // top suggestion. Indexing this fixed list by historyIndex instead makes
+  // each arrow press land on the next entry of the one list the reader
+  // actually sees on screen.
+  const initialSuggestionsRef = useRef(initial.suggestions)
+
   // Keys of documents whose stream URL has already been Range-warmed this
   // session — prevents re-issuing the same upstream Telegram fetch every
   // time the reader navigates near a document that was already prefetched.
@@ -209,9 +221,11 @@ export function DocumentViewerShell({ initial }: DocumentViewerShellProps) {
       goTo(ref, { pushUrl: true })
       return
     }
-    if (current.gated || !current.suggestions[0]) return
+    if (current.gated) return
+    const nextSuggestion = initialSuggestionsRef.current[historyIndex]
+    if (!nextSuggestion) return
     await exitFullscreenIfActive()
-    const ref: DocRef = { type: current.suggestions[0].type, slug: current.suggestions[0].slug }
+    const ref: DocRef = { type: nextSuggestion.type, slug: nextSuggestion.slug }
     setHistory(h => [...h.slice(0, historyIndex + 1), ref])
     setHistoryIndex(historyIndex + 1)
     goTo(ref, { pushUrl: true })
@@ -272,7 +286,10 @@ export function DocumentViewerShell({ initial }: DocumentViewerShellProps) {
     const targets: DocRef[] = []
     if (historyIndex > 0) targets.push(history[historyIndex - 1])
     if (historyIndex < history.length - 1) targets.push(history[historyIndex + 1])
-    else if (current.suggestions[0]) targets.push({ type: current.suggestions[0].type, slug: current.suggestions[0].slug })
+    else if (initialSuggestionsRef.current[historyIndex]) {
+      const s = initialSuggestionsRef.current[historyIndex]
+      targets.push({ type: s.type, slug: s.slug })
+    }
 
     const timer = setTimeout(() => {
       if (cancelled) return
@@ -301,11 +318,11 @@ export function DocumentViewerShell({ initial }: DocumentViewerShellProps) {
   }, [switchError])
 
   const canPrev = historyIndex > 0
-  const canNext = historyIndex < history.length - 1 || (!current.gated && current.suggestions.length > 0)
+  const canNext = historyIndex < history.length - 1 || (!current.gated && historyIndex < initialSuggestionsRef.current.length)
   const prevLabel = canPrev ? cacheRef.current!.get(key(history[historyIndex - 1]))?.state.title : undefined
   const nextLabel = historyIndex < history.length - 1
     ? cacheRef.current!.get(key(history[historyIndex + 1]))?.state.title
-    : (!current.gated ? current.suggestions[0]?.title : undefined)
+    : (!current.gated ? initialSuggestionsRef.current[historyIndex]?.title : undefined)
 
   const navProps = { canPrev, canNext, prevLabel, nextLabel, onPrev: goPrev, onNext: goNext, disabled: switching }
 
@@ -340,8 +357,12 @@ export function DocumentViewerShell({ initial }: DocumentViewerShellProps) {
 
       {switchError && <p className="text-sm text-red-500 text-center">{switchError}</p>}
 
+      {/* Deliberately the frozen initial list, not current.suggestions — see
+          initialSuggestionsRef above. Keeps this grid showing the same
+          documents the arrow itself steps through, so neither shifts
+          independently of the other as the reader navigates. */}
       {!current.gated && (
-        <SuggestedMaterials suggestions={current.suggestions} onSelect={goToSuggestion} disabled={switching} />
+        <SuggestedMaterials suggestions={initialSuggestionsRef.current} onSelect={goToSuggestion} disabled={switching} />
       )}
     </div>
   )
