@@ -108,7 +108,7 @@ export function AdminUsersTable({ users, total, page }: { users: any[]; total: n
   )
 }
 
-interface ActivityView { id: string; type: 'note' | 'pyq'; title: string; slug: string | null; createdAt: string }
+interface ActivityView { id: string; type: 'note' | 'pyq'; title: string; slug: string | null; createdAt: string; viewCount: number }
 interface ActivitySearch { id: string; query: string; page: string; createdAt: string }
 
 function UserActivityDialog({ user, onClose }: { user: { id: string; name: string } | null; onClose: () => void }) {
@@ -149,7 +149,7 @@ function UserActivityDialog({ user, onClose }: { user: { id: string; name: strin
                   <div key={v.id} className="flex items-start justify-between gap-2 text-xs">
                     <div className="min-w-0">
                       <p className="truncate font-medium">{v.title}</p>
-                      <p className="text-muted-foreground">{v.type === 'note' ? 'Note' : 'PYQ'} · {formatRelativeTime(v.createdAt)}</p>
+                      <p className="text-muted-foreground">{v.type === 'note' ? 'Note' : 'PYQ'} · {formatRelativeTime(v.createdAt)}{v.viewCount > 1 && ` · viewed ${v.viewCount}×`}</p>
                     </div>
                     {v.slug && (
                       <Link href={`/${v.type}/${v.slug}`} target="_blank" className="text-primary flex-shrink-0 mt-0.5"><ExternalLink className="h-3 w-3" /></Link>

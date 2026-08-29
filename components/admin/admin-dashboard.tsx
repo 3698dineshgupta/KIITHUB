@@ -11,39 +11,62 @@ import { formatDate, formatRelativeTime, formatDuration } from '@/lib/utils'
 // beats of slack for network jitter/backgrounding before reading "offline".
 const ONLINE_WINDOW_MS = 90_000
 
+const EMPTY_ANALYTICS = {
+  totalUsers: 0, premiumUsers: 0, totalNotes: 0, totalPYQs: 0, totalDownloads: 0, pendingPayments: 0,
+  recentUsers: 0, recentViews: 0, topDocuments: [] as { id: string; title: string; subject: string; viewCount: number; isPremium: boolean; type: 'note' | 'pyq' }[],
+  recentPayments: [] as { id: string; transactionId: string; createdAt: Date; user: { name: string; email: string } }[],
+  onlineCount: 0,
+  onlineUsers: [] as { id: string; name: string; email: string; role: string; lastActiveAt: Date | null }[],
+  mostActiveUsers: [] as { id: string; name: string; email: string; totalTimeSpentSec: number }[],
+}
+
 async function getAnalytics() {
   const d7 = new Date(Date.now() - 7 * 86400000)
   const onlineSince = new Date(Date.now() - ONLINE_WINDOW_MS)
-  const [
-    totalUsers, premiumUsers, totalNotes, totalPYQs, totalDownloads, pendingPayments,
-    recentUsers, recentViews, topNotes, topPyqs, recentPayments,
-    onlineCount, onlineUsers, mostActiveUsers,
-  ] = await Promise.all([
-    prisma.user.count(),
-    prisma.user.count({ where: { membershipStatus: 'PREMIUM' } }),
-    prisma.note.count({ where: { isPublished: true } }),
-    prisma.pYQ.count({ where: { isPublished: true } }),
-    prisma.download.count(),
-    prisma.paymentRequest.count({ where: { status: 'PENDING' } }),
-    prisma.user.count({ where: { createdAt: { gte: d7 } } }),
-    prisma.view.count({ where: { createdAt: { gte: d7 } } }),
-    prisma.note.findMany({ where: { isPublished: true }, orderBy: { viewCount: 'desc' }, take: 5, include: { subject: true } }),
-    prisma.pYQ.findMany({ where: { isPublished: true }, orderBy: { viewCount: 'desc' }, take: 5, include: { subject: true } }),
-    prisma.paymentRequest.findMany({ where: { status: 'PENDING' }, include: { user: { select: { name: true, email: true } } }, orderBy: { createdAt: 'desc' }, take: 5 }),
-    prisma.user.count({ where: { lastActiveAt: { gte: onlineSince } } }),
-    prisma.user.findMany({ where: { lastActiveAt: { gte: onlineSince } }, orderBy: { lastActiveAt: 'desc' }, take: 8, select: { id: true, name: true, email: true, role: true, lastActiveAt: true } }),
-    prisma.user.findMany({ where: { totalTimeSpentSec: { gt: 0 } }, orderBy: { totalTimeSpentSec: 'desc' }, take: 5, select: { id: true, name: true, email: true, totalTimeSpentSec: true } }),
-  ])
+  // This one component now fires 14 concurrent queries — comfortably over
+  // DATABASE_URL's connection_limit=10 pool on its own, before accounting
+  // for whatever else the build's other concurrently-generated pages are
+  // also opening. Confirmed live: this exact page failed the production
+  // build 3/3 times in a row on a transient "Can't reach database server",
+  // never on any other admin page. A DB hiccup here degrading the dashboard
+  // to zeros for one request is a far smaller cost than it taking down the
+  // entire deploy — same tradeoff already made for the homepage and
+  // /calculator.
+  try {
+    const [
+      totalUsers, premiumUsers, totalNotes, totalPYQs, totalDownloads, pendingPayments,
+      recentUsers, recentViews, topNotes, topPyqs, recentPayments,
+      onlineCount, onlineUsers, mostActiveUsers,
+    ] = await Promise.all([
+      prisma.user.count(),
+      prisma.user.count({ where: { membershipStatus: 'PREMIUM' } }),
+      prisma.note.count({ where: { isPublished: true } }),
+      prisma.pYQ.count({ where: { isPublished: true } }),
+      prisma.download.count(),
+      prisma.paymentRequest.count({ where: { status: 'PENDING' } }),
+      prisma.user.count({ where: { createdAt: { gte: d7 } } }),
+      prisma.view.count({ where: { createdAt: { gte: d7 } } }),
+      prisma.note.findMany({ where: { isPublished: true }, orderBy: { viewCount: 'desc' }, take: 5, include: { subject: true } }),
+      prisma.pYQ.findMany({ where: { isPublished: true }, orderBy: { viewCount: 'desc' }, take: 5, include: { subject: true } }),
+      prisma.paymentRequest.findMany({ where: { status: 'PENDING' }, include: { user: { select: { name: true, email: true } } }, orderBy: { createdAt: 'desc' }, take: 5 }),
+      prisma.user.count({ where: { lastActiveAt: { gte: onlineSince } } }),
+      prisma.user.findMany({ where: { lastActiveAt: { gte: onlineSince } }, orderBy: { lastActiveAt: 'desc' }, take: 8, select: { id: true, name: true, email: true, role: true, lastActiveAt: true } }),
+      prisma.user.findMany({ where: { totalTimeSpentSec: { gt: 0 } }, orderBy: { totalTimeSpentSec: 'desc' }, take: 5, select: { id: true, name: true, email: true, totalTimeSpentSec: true } }),
+    ])
 
-  // Notes and PYQs are separate tables (separate viewCount columns), so
-  // "most visited document" needs both merged and re-ranked together rather
-  // than just showing notes.
-  const topDocuments = [
-    ...topNotes.map(n => ({ id: n.id, title: n.title, subject: n.subject.name, viewCount: n.viewCount, isPremium: n.isPremium, type: 'note' as const })),
-    ...topPyqs.map(p => ({ id: p.id, title: p.title, subject: p.subject.name, viewCount: p.viewCount, isPremium: p.isPremium, type: 'pyq' as const })),
-  ].sort((a, b) => b.viewCount - a.viewCount).slice(0, 5)
+    // Notes and PYQs are separate tables (separate viewCount columns), so
+    // "most visited document" needs both merged and re-ranked together rather
+    // than just showing notes.
+    const topDocuments = [
+      ...topNotes.map(n => ({ id: n.id, title: n.title, subject: n.subject.name, viewCount: n.viewCount, isPremium: n.isPremium, type: 'note' as const })),
+      ...topPyqs.map(p => ({ id: p.id, title: p.title, subject: p.subject.name, viewCount: p.viewCount, isPremium: p.isPremium, type: 'pyq' as const })),
+    ].sort((a, b) => b.viewCount - a.viewCount).slice(0, 5)
 
-  return { totalUsers, premiumUsers, totalNotes, totalPYQs, totalDownloads, pendingPayments, recentUsers, recentViews, topDocuments, recentPayments, onlineCount, onlineUsers, mostActiveUsers }
+    return { totalUsers, premiumUsers, totalNotes, totalPYQs, totalDownloads, pendingPayments, recentUsers, recentViews, topDocuments, recentPayments, onlineCount, onlineUsers, mostActiveUsers }
+  } catch (err) {
+    console.error('getAnalytics error:', err)
+    return EMPTY_ANALYTICS
+  }
 }
 
 export async function AdminDashboard() {
