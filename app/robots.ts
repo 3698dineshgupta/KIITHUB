@@ -25,6 +25,6 @@ export default function robots(): MetadataRoute.Robots {
         '/upload-earn',
       ],
     },
-    sitemap: `${baseUrl}/sitemap.xml`,
+    sitemap: [`${baseUrl}/sitemap-index.xml`, `${baseUrl}/sitemap.xml`],
   };
 }

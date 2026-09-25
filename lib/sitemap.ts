@@ -100,6 +100,25 @@ export async function getSitemapEntries(): Promise<SitemapEntry[]> {
   return entries
 }
 
+export type SitemapSection = 'pages' | 'notes' | 'pyq' | 'merchandise'
+
+export const SITEMAP_SECTIONS: SitemapSection[] = ['pages', 'notes', 'pyq', 'merchandise']
+
+/** Canonical URL of one section's child sitemap, as listed in the sitemap index. */
+export function sectionSitemapUrl(section: SitemapSection): string {
+  return `${SITE_URL}/sitemaps/${section}.xml`
+}
+
+/** Same entries as getSitemapEntries, grouped by section (detail pages by path prefix, everything else is 'pages'). */
+export async function getSitemapSections(): Promise<Record<SitemapSection, SitemapEntry[]>> {
+  const sections: Record<SitemapSection, SitemapEntry[]> = { pages: [], notes: [], pyq: [], merchandise: [] }
+  for (const e of await getSitemapEntries()) {
+    const section = SITEMAP_SECTIONS.find(s => s !== 'pages' && e.loc.startsWith(`${SITE_URL}/${s}/`)) ?? 'pages'
+    sections[section].push(e)
+  }
+  return sections
+}
+
 /** Serializes entries to sitemap XML — hand-built, not framework-serialized, so every byte is accounted for. */
 export function buildSitemapXml(entries: SitemapEntry[]): string {
   const body = entries
@@ -114,4 +133,25 @@ export function buildSitemapXml(entries: SitemapEntry[]): string {
     .join('\n')
 
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`
+}
+
+/**
+ * Serializes a sitemap index pointing at each non-empty section's child sitemap. Each
+ * child's lastmod is its newest entry's, so crawlers can skip unchanged ones.
+ */
+export function buildSitemapIndexXml(sections: Record<SitemapSection, SitemapEntry[]>): string {
+  const body = SITEMAP_SECTIONS
+    .filter(section => sections[section].length > 0) // an empty child sitemap is a Search Console warning
+    .map(section => {
+      const lastmod = sections[section].reduce<string | null>((max, e) => (!max || e.lastmod > max ? e.lastmod : max), null)
+      return [
+        '  <sitemap>',
+        `    <loc>${escapeXml(sectionSitemapUrl(section))}</loc>`,
+        ...(lastmod ? [`    <lastmod>${lastmod}</lastmod>`] : []),
+        '  </sitemap>',
+      ].join('\n')
+    })
+    .join('\n')
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</sitemapindex>\n`
 }
