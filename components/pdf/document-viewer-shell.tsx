@@ -5,7 +5,6 @@ import { PDFViewer } from '@/components/pdf/pdf-viewer'
 import { PremiumGateInline } from '@/components/pdf/premium-gate-inline'
 import { DocumentNavArrows } from '@/components/pdf/document-nav-arrows'
 import { SuggestedMaterials } from '@/components/pdf/suggested-materials'
-import { SubjectDocumentsPanel } from '@/components/pdf/subject-documents-panel'
 import { useDocumentLoaderStore } from '@/store'
 import { cn } from '@/lib/utils'
 import type { DocumentDetail } from '@/lib/document-types'
@@ -349,16 +348,7 @@ export function DocumentViewerShell({ initial }: DocumentViewerShellProps) {
   return (
     <div className="space-y-6">
       {!current.gated ? (
-        <>
-          <NoteMetaCard note={current.meta} />
-          <SubjectDocumentsPanel
-            subjectName={current.meta.subject.name}
-            groups={current.subjectDocuments}
-            current={{ type: current.type, slug: current.slug }}
-            onSelect={goToSuggestion}
-            disabled={switching}
-          />
-        </>
+        <NoteMetaCard note={current.meta} />
       ) : (
         <div className="rounded-xl border p-6">
           <h1 className="text-xl font-bold">{current.title}</h1>

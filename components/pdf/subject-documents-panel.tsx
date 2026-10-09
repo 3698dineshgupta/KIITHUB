@@ -1,57 +1,10 @@
 'use client'
-import { useState } from 'react'
-import { Check, ChevronDown, Crown, FileStack } from 'lucide-react'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Check, Crown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { SubjectDocumentGroup, SubjectDocumentItem } from '@/lib/subject-documents'
 
 export interface SubjectDocumentsSelectHandler {
   (item: { type: 'note' | 'pyq'; slug: string }): void
-}
-
-interface SubjectDocumentsPanelProps {
-  subjectName: string
-  groups: SubjectDocumentGroup[]
-  current: { type: 'note' | 'pyq'; slug: string }
-  onSelect: SubjectDocumentsSelectHandler
-  disabled?: boolean
-}
-
-// All documents for the subject currently on screen, grouped the way they're
-// categorized everywhere else (Syllabus / Notes / Lab Manual / Assignment /
-// Past Questions) — so a reader doesn't have to leave the viewer and go back
-// to the subject's listing page to find a sibling document. Backed by
-// getSubjectDocuments, which is exhaustive and un-ranked by design (unlike
-// Suggested Materials below it), so nothing in the subject is ever missing
-// from here for scoring too low.
-export function SubjectDocumentsPanel({ subjectName, groups, current, onSelect, disabled }: SubjectDocumentsPanelProps) {
-  const [open, setOpen] = useState(true)
-  const total = groups.reduce((sum, g) => sum + g.items.length, 0)
-  if (total === 0) return null
-
-  return (
-    <Card className="p-4 sm:p-5">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="flex w-full items-center justify-between gap-2 text-left"
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <FileStack className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-          <span className="font-semibold text-sm truncate">Documents</span>
-          <Badge variant="secondary" className="flex-shrink-0">{total}</Badge>
-          <span className="text-xs text-muted-foreground truncate hidden sm:inline">· {subjectName}</span>
-        </div>
-        <ChevronDown className={cn('h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} />
-      </button>
-
-      {open && (
-        <div className="mt-3 max-h-80 overflow-y-auto pr-1">
-          <SubjectDocumentsList groups={groups} current={current} onSelect={onSelect} disabled={disabled} />
-        </div>
-      )}
-    </Card>
-  )
 }
 
 interface SubjectDocumentsListProps {
@@ -61,10 +14,10 @@ interface SubjectDocumentsListProps {
   disabled?: boolean
 }
 
-// Bare grouped list, no Card/header/collapse — shared between the inline
-// panel above and the toolbar popover in pdf-viewer.tsx, which needs its own
-// floating shell (it has to render inside PDFViewer's own fullscreen
-// container to stay visible in fullscreen; a Card here would double up).
+// Bare grouped list, no Card/header — rendered inside the toolbar popover in
+// pdf-viewer.tsx, which supplies its own floating shell (it has to render
+// inside PDFViewer's own fullscreen container to stay visible in fullscreen,
+// so it owns its own header rather than wrapping this in a second one).
 export function SubjectDocumentsList({ groups, current, onSelect, disabled }: SubjectDocumentsListProps) {
   return (
     <div className="space-y-3">
