@@ -12,6 +12,7 @@ import { NoteMetaCard } from '@/components/notes/note-meta-card'
 import { DocumentViewerShell } from '@/components/pdf/document-viewer-shell'
 import { cache, CACHE_KEYS } from '@/lib/redis'
 import { getSuggestions } from '@/lib/recommendations'
+import { getSubjectDocuments } from '@/lib/subject-documents'
 import { JsonLd, SITE_URL, breadcrumbJsonLd } from '@/components/seo/json-ld'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -112,17 +113,20 @@ export default async function NoteViewPage({ params }: { params: Promise<{ slug:
     if (devTiming) console.log(`[notes/${slug}] token+view recorded +${(performance.now() - t0).toFixed(0)}ms`)
   }
 
-  const suggestions = streamToken
-    ? await getSuggestions({
-        type: 'note',
-        id: note.id,
-        subjectId: note.subjectId,
-        semesterId: note.semesterId,
-        branchId: note.branchId,
-        contentType: note.contentType,
-        tags: note.tags.map(t => t.tag),
-      })
-    : []
+  const [suggestions, subjectDocuments] = streamToken
+    ? await Promise.all([
+        getSuggestions({
+          type: 'note',
+          id: note.id,
+          subjectId: note.subjectId,
+          semesterId: note.semesterId,
+          branchId: note.branchId,
+          contentType: note.contentType,
+          tags: note.tags.map(t => t.tag),
+        }),
+        getSubjectDocuments(note.subjectId),
+      ])
+    : [[], []]
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -140,6 +144,7 @@ export default async function NoteViewPage({ params }: { params: Promise<{ slug:
             userEmail: user?.email ?? '',
             meta: note,
             suggestions,
+            subjectDocuments,
           }}
         />
       ) : (

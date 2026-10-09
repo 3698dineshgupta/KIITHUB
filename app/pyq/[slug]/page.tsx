@@ -10,6 +10,7 @@ import { CloseDocumentLoader } from '@/components/pdf/close-document-loader'
 import { NoteMetaCard } from '@/components/notes/note-meta-card'
 import { DocumentViewerShell } from '@/components/pdf/document-viewer-shell'
 import { getSuggestions } from '@/lib/recommendations'
+import { getSubjectDocuments } from '@/lib/subject-documents'
 import { JsonLd, SITE_URL, breadcrumbJsonLd } from '@/components/seo/json-ld'
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -91,16 +92,19 @@ export default async function PYQViewPage({ params }: { params: Promise<{ slug: 
     if (devTiming) console.log(`[pyq/${slug}] token+view recorded +${(performance.now() - t0).toFixed(0)}ms`)
   }
 
-  const suggestions = streamToken
-    ? await getSuggestions({
-        type: 'pyq',
-        id: pyq.id,
-        subjectId: pyq.subjectId,
-        semesterId: pyq.semesterId,
-        branchId: pyq.branchId,
-        examType: pyq.examType,
-      })
-    : []
+  const [suggestions, subjectDocuments] = streamToken
+    ? await Promise.all([
+        getSuggestions({
+          type: 'pyq',
+          id: pyq.id,
+          subjectId: pyq.subjectId,
+          semesterId: pyq.semesterId,
+          branchId: pyq.branchId,
+          examType: pyq.examType,
+        }),
+        getSubjectDocuments(pyq.subjectId),
+      ])
+    : [[], []]
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -118,6 +122,7 @@ export default async function PYQViewPage({ params }: { params: Promise<{ slug: 
             userEmail: user?.email ?? '',
             meta: { ...pyq, contentType: 'PYQ', tags: [] },
             suggestions,
+            subjectDocuments,
           }}
         />
       ) : (

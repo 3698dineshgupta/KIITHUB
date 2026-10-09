@@ -5,9 +5,10 @@ import { PDFViewer } from '@/components/pdf/pdf-viewer'
 import { PremiumGateInline } from '@/components/pdf/premium-gate-inline'
 import { DocumentNavArrows } from '@/components/pdf/document-nav-arrows'
 import { SuggestedMaterials } from '@/components/pdf/suggested-materials'
+import { SubjectDocumentsPanel } from '@/components/pdf/subject-documents-panel'
 import { useDocumentLoaderStore } from '@/store'
+import { cn } from '@/lib/utils'
 import type { DocumentDetail } from '@/lib/document-types'
-import type { SuggestionItem } from '@/lib/recommendations'
 
 type DocType = 'note' | 'pyq'
 type DocRef = { type: DocType; slug: string }
@@ -190,23 +191,43 @@ export function DocumentViewerShell({ initial }: DocumentViewerShellProps) {
     }
   }
 
-  // Each mounted document owns its own fullscreen container (its own
-  // PDFViewer's root div). Switching documents hides the previous one's
-  // wrapper (`display:none`), and a fullscreen element being hidden or
-  // detached forces the browser to exit fullscreen on its own, uncontrolled
-  // — happening at the exact same moment the new document mounts and does
-  // its heaviest render work (first pages, fresh canvas). Two expensive
-  // layout/paint operations landing simultaneously is what was freezing the
-  // tab. Exiting fullscreen explicitly first, and waiting for it to finish,
-  // sequences the two instead of letting them collide.
-  async function exitFullscreenIfActive() {
-    if (typeof document === 'undefined' || !document.fullscreenElement) return
-    try { await document.exitFullscreen() } catch { /* best-effort */ }
+  // Fullscreen used to belong to each mounted document's own PDFViewer root
+  // div. Switching documents hid the previous one's wrapper (`display:none`),
+  // and a fullscreen element being hidden or detached forces the browser to
+  // exit fullscreen on its own, uncontrolled — so every navigation used to
+  // explicitly exit fullscreen first rather than fight that. That meant
+  // fullscreen never survived a Prev/Next/Suggested-Material/Documents-panel
+  // switch, even though the reader very plainly wants to stay immersed while
+  // reading a stack of related material.
+  //
+  // Requesting fullscreen on THIS wrapper instead — a single ancestor that's
+  // always mounted and never hidden, with only the individual mounted-doc
+  // children toggling visibility beneath it — fixes that: the fullscreen
+  // element itself is untouched by a document switch, so the browser has no
+  // reason to force an exit, and fullscreen simply carries over to whichever
+  // document becomes current.
+  const shellContainerRef = useRef<HTMLDivElement>(null)
+  const [fullscreen, setFullscreen] = useState(false)
+
+  useEffect(() => {
+    const onFSChange = () => setFullscreen(document.fullscreenElement === shellContainerRef.current)
+    document.addEventListener('fullscreenchange', onFSChange)
+    return () => document.removeEventListener('fullscreenchange', onFSChange)
+  }, [])
+
+  async function toggleFullscreen() {
+    if (!shellContainerRef.current) return
+    try {
+      if (document.fullscreenElement === shellContainerRef.current) {
+        await document.exitFullscreen()
+      } else {
+        await shellContainerRef.current.requestFullscreen()
+      }
+    } catch { /* best-effort */ }
   }
 
   async function goPrev() {
     if (switching || historyIndex <= 0) return
-    await exitFullscreenIfActive()
     const ref = history[historyIndex - 1]
     setHistoryIndex(historyIndex - 1)
     goTo(ref, { pushUrl: true })
@@ -215,7 +236,6 @@ export function DocumentViewerShell({ initial }: DocumentViewerShellProps) {
   async function goNext() {
     if (switching) return
     if (historyIndex < history.length - 1) {
-      await exitFullscreenIfActive()
       const ref = history[historyIndex + 1]
       setHistoryIndex(historyIndex + 1)
       goTo(ref, { pushUrl: true })
@@ -224,16 +244,16 @@ export function DocumentViewerShell({ initial }: DocumentViewerShellProps) {
     if (current.gated) return
     const nextSuggestion = initialSuggestionsRef.current[historyIndex]
     if (!nextSuggestion) return
-    await exitFullscreenIfActive()
     const ref: DocRef = { type: nextSuggestion.type, slug: nextSuggestion.slug }
     setHistory(h => [...h.slice(0, historyIndex + 1), ref])
     setHistoryIndex(historyIndex + 1)
     goTo(ref, { pushUrl: true })
   }
 
-  async function goToSuggestion(item: SuggestionItem) {
+  // Shared by Suggested Materials and the subject Documents panel — both
+  // just need a type+slug to jump to.
+  async function goToSuggestion(item: DocRef) {
     if (switching) return
-    await exitFullscreenIfActive()
     const ref: DocRef = { type: item.type, slug: item.slug }
     setHistory(h => [...h.slice(0, historyIndex + 1), ref])
     setHistoryIndex(historyIndex + 1)
@@ -329,25 +349,50 @@ export function DocumentViewerShell({ initial }: DocumentViewerShellProps) {
   return (
     <div className="space-y-6">
       {!current.gated ? (
-        <NoteMetaCard note={current.meta} />
+        <>
+          <NoteMetaCard note={current.meta} />
+          <SubjectDocumentsPanel
+            subjectName={current.meta.subject.name}
+            groups={current.subjectDocuments}
+            current={{ type: current.type, slug: current.slug }}
+            onSelect={goToSuggestion}
+            disabled={switching}
+          />
+        </>
       ) : (
         <div className="rounded-xl border p-6">
           <h1 className="text-xl font-bold">{current.title}</h1>
         </div>
       )}
 
-      {mountedDocs.map(d => (
-        <div key={d.key} className={d.key === key({ type: current.type, slug: current.slug }) && !current.gated ? '' : 'hidden'}>
-          <PDFViewer
-            streamUrl={d.state.streamUrl}
-            title={d.state.title}
-            isPremium={d.state.isPremium}
-            totalPages={d.state.totalPages}
-            userEmail={d.state.userEmail}
-            nav={navProps}
-          />
-        </div>
-      ))}
+      <div ref={shellContainerRef} className={fullscreen ? 'fixed inset-0 z-50 bg-zinc-950' : undefined}>
+        {mountedDocs.map(d => (
+          <div
+            key={d.key}
+            className={cn(
+              d.key === key({ type: current.type, slug: current.slug }) && !current.gated ? '' : 'hidden',
+              fullscreen && 'h-full'
+            )}
+          >
+            <PDFViewer
+              streamUrl={d.state.streamUrl}
+              title={d.state.title}
+              isPremium={d.state.isPremium}
+              totalPages={d.state.totalPages}
+              userEmail={d.state.userEmail}
+              nav={navProps}
+              fullscreen={fullscreen}
+              onToggleFullscreen={toggleFullscreen}
+              documents={{
+                subjectName: d.state.meta.subject.name,
+                groups: d.state.subjectDocuments,
+                current: { type: d.state.type, slug: d.state.slug },
+                onSelect: goToSuggestion,
+              }}
+            />
+          </div>
+        ))}
+      </div>
       {current.gated && (
         <div className="relative">
           <PremiumGateInline />

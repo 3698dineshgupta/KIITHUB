@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyStreamToken } from '@/lib/jwt'
 import { prisma } from '@/lib/prisma'
-import { buildPdfResponse } from '@/lib/pdf-stream'
+import { buildPdfResponse, getCachedPyqMeta } from '@/lib/pdf-stream'
 import { canAccessPremiumDoc } from '@/lib/upload-reward'
 
 const devTiming = process.env.NODE_ENV !== 'production'
@@ -23,10 +23,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
     if (devTiming) console.log(`[stream/pyq] token verified +${(performance.now() - t0).toFixed(0)}ms`)
 
-    // User and PYQ lookups are independent — run concurrently.
+    // User and PYQ lookups are independent — run concurrently. The PYQ side
+    // is cached (getCachedPyqMeta) — see the identical comment in
+    // stream/note/[id]/route.ts for why.
     const [user, pyq] = await Promise.all([
       prisma.user.findUnique({ where: { id: payload.userId } }),
-      prisma.pYQ.findUnique({ where: { id } }),
+      getCachedPyqMeta(id),
     ])
     if (devTiming) console.log(`[stream/pyq] user+pyq fetched +${(performance.now() - t0).toFixed(0)}ms`)
 
@@ -34,7 +36,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!pyq || !pyq.isPublished) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     // Read-only — see the identical comment in stream/note/[id]/route.ts.
-    if (pyq.isPremium && !(await canAccessPremiumDoc(user, 'pyq', pyq.id))) {
+    if (pyq.isPremium && !(await canAccessPremiumDoc(user, 'pyq', id))) {
       return NextResponse.json({ error: 'Premium required' }, { status: 403 })
     }
 

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { isPremiumActive } from '@/lib/utils'
 import { signStreamToken } from '@/lib/jwt'
 import { getSuggestions } from '@/lib/recommendations'
+import { getSubjectDocuments } from '@/lib/subject-documents'
 import { canAccessPremiumDoc } from '@/lib/upload-reward'
 
 // Side-effect-free by design (no view recording, no write of any kind) so the
@@ -47,7 +48,7 @@ export async function GET(
     }
 
     const isNote = type === 'note'
-    const [streamToken, suggestions] = await Promise.all([
+    const [streamToken, suggestions, subjectDocuments] = await Promise.all([
       signStreamToken({ resourceId: doc.id, resourceType: type, userId: user.id, isPremium: userIsPremium }),
       getSuggestions({
         type,
@@ -59,6 +60,7 @@ export async function GET(
         examType: !isNote ? (doc as typeof doc & { examType: string }).examType : undefined,
         tags: isNote ? (doc as typeof doc & { tags: { tag: string }[] }).tags.map(t => t.tag) : undefined,
       }),
+      getSubjectDocuments(doc.subjectId),
     ])
 
     const meta = isNote
@@ -75,6 +77,7 @@ export async function GET(
       userEmail: user.email ?? '',
       meta,
       suggestions,
+      subjectDocuments,
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : ''

@@ -4,22 +4,51 @@ import { cache, CACHE_KEYS } from '@/lib/redis'
 import { telegramGetFileUrl } from '@/lib/telegram'
 import { supabaseCreateSignedUrl } from '@/lib/supabase'
 
-// Documents under this size get fully buffered and cached in Redis (base64)
-// so repeat opens skip Telegram/Supabase entirely — every uncached open was
-// re-fetching from Telegram's file API on every single view, by every user,
-// which is what was making the "Preparing secure stream..." step slow.
-// Verified live against this project's actual Upstash instance: a 5MB SET
-// succeeds, an 8MB one hits Upstash's real request-size ceiling ("max
-// request size exceeded. Limit: 10485760 bytes"). 3MB (post-base64 ~4MB
-// request) sits well under that with margin, and covers 94.5% of this
-// project's published note/PYQ files by actual size (measured: p90 1.3MB,
-// p95 3.7MB) — pushing to 6MB only reaches 95.6% for roughly double the
-// Redis storage, not worth it. Larger files are streamed straight through
-// instead of buffered — not cached, but avoids paying for a full
-// server-side download before the client sees any bytes.
-const MAX_CACHE_BYTES = 3 * 1024 * 1024
-
 const devTiming = process.env.NODE_ENV !== 'production'
+
+export interface StreamDocMeta {
+  isPublished: boolean
+  isPremium: boolean
+  telegramFileId: string
+  telegramMsgId: string
+  title: string
+  fileSize: number | null
+}
+
+// pdf.js fetches a document in many small Range requests, not one — each one
+// a separate hit to this route. Re-querying Postgres for the note/PYQ row on
+// every single one of those (previously ~800-1400ms each, per live
+// measurement) multiplied into real cumulative delay across a document
+// view. This metadata barely changes after upload, so a short cache absorbs
+// that fan-out: 2 minutes bounds staleness to roughly one reading session
+// without needing invalidation wired into every edit path.
+const DOC_META_TTL = 120
+
+export async function getCachedNoteMeta(id: string): Promise<StreamDocMeta | null> {
+  const key = CACHE_KEYS.noteDetail(id)
+  const cached = await cache.get<StreamDocMeta>(key)
+  if (cached) return cached
+  const note = await prisma.note.findUnique({
+    where: { id },
+    select: { isPublished: true, isPremium: true, telegramFileId: true, telegramMsgId: true, title: true, fileSize: true },
+  })
+  if (!note) return null
+  cache.set(key, note, DOC_META_TTL).catch(() => {})
+  return note
+}
+
+export async function getCachedPyqMeta(id: string): Promise<StreamDocMeta | null> {
+  const key = CACHE_KEYS.pyqDetail(id)
+  const cached = await cache.get<StreamDocMeta>(key)
+  if (cached) return cached
+  const pyq = await prisma.pYQ.findUnique({
+    where: { id },
+    select: { isPublished: true, isPremium: true, telegramFileId: true, telegramMsgId: true, title: true, fileSize: true },
+  })
+  if (!pyq) return null
+  cache.set(key, pyq, DOC_META_TTL).catch(() => {})
+  return pyq
+}
 
 function pdfHeaders(title: string, contentLength?: number) {
   const headers: Record<string, string> = {
@@ -35,28 +64,6 @@ function pdfHeaders(title: string, contentLength?: number) {
   }
   if (contentLength) headers['Content-Length'] = String(contentLength)
   return headers
-}
-
-function parseRange(rangeHeader: string, totalLength: number): { start: number; end: number } | null {
-  const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim())
-  if (!match || (!match[1] && !match[2])) return null
-  const start = match[1] ? parseInt(match[1], 10) : totalLength - parseInt(match[2], 10)
-  const end = match[2] && match[1] ? Math.min(parseInt(match[2], 10), totalLength - 1) : totalLength - 1
-  if (start < 0 || end < start) return null
-  return { start, end }
-}
-
-function sliceResponse(buf: Buffer, title: string, rangeHeader?: string | null): NextResponse {
-  if (rangeHeader) {
-    const range = parseRange(rangeHeader, buf.length)
-    if (range) {
-      const slice = buf.subarray(range.start, range.end + 1)
-      const headers = pdfHeaders(title, slice.length)
-      headers['Content-Range'] = `bytes ${range.start}-${range.end}/${buf.length}`
-      return new NextResponse(new Uint8Array(slice), { status: 206, headers })
-    }
-  }
-  return new NextResponse(new Uint8Array(buf), { headers: pdfHeaders(title, buf.length) })
 }
 
 async function getSupabaseBucket(): Promise<string> {
@@ -125,25 +132,29 @@ export interface StreamablePdf {
 }
 
 /**
- * Serves a PDF for streaming to react-pdf/pdf.js: Redis byte-cache hit
- * returns instantly, a cache miss on a small file buffers once and caches
- * it, and anything else streams straight through from the upstream
- * (Telegram/Supabase) response instead of buffering the whole file
- * server-side before the client sees a single byte.
+ * Serves a PDF for streaming to react-pdf/pdf.js: always a direct
+ * streaming pass-through from the upstream (Telegram/Supabase) response —
+ * never buffered server-side first.
+ *
+ * This used to fully buffer small files and cache the bytes (base64) in
+ * Redis so repeat opens could skip Telegram/Supabase entirely. Measured
+ * live against this project's actual Upstash instance, that cache was the
+ * opposite of a speedup: Upstash's REST API round-trips the *entire* value
+ * over HTTPS as a JSON request/response body, so a ~1.6MB PDF (~2.2MB once
+ * base64-encoded) took 14-22s just for the SET on a cache miss, and 1.7-2.8s
+ * for the GET on every subsequent request — "hit" included — because the
+ * whole blob still has to cross the REST round trip before a single byte
+ * reaches the client. A direct Telegram fetch reached first-byte in 0.6-2.7s
+ * in the same testing, and streams progressively from there. Upstash REST is
+ * a good fit for small JSON values (see the other CACHE_KEYS below) and a
+ * poor one for multi-megabyte blobs — the short-lived telegramUrl cache a
+ * few lines up is the right-sized use of it here, not this.
  */
 export async function buildPdfResponse(doc: StreamablePdf, rangeHeader?: string | null): Promise<NextResponse> {
   const t0 = devTiming ? performance.now() : 0
   const mark = (label: string) => {
     if (devTiming) console.log(`[pdf-stream] ${label} +${(performance.now() - t0).toFixed(0)}ms`)
   }
-
-  const byteCacheKey = CACHE_KEYS.pdfBytes(doc.telegramFileId)
-  const cached = await cache.get<string>(byteCacheKey)
-  if (cached) {
-    mark('cache HIT, serving buffered bytes')
-    return sliceResponse(Buffer.from(cached, 'base64'), doc.title, rangeHeader)
-  }
-  mark('cache miss, fetching upstream')
 
   const upstreamRes = await fetchUpstream(doc.telegramFileId, doc.telegramMsgId, doc.fileSize, rangeHeader)
   if (!upstreamRes.body) {
@@ -154,7 +165,7 @@ export async function buildPdfResponse(doc: StreamablePdf, rangeHeader?: string 
   const contentLength = Number(upstreamRes.headers.get('content-length') || 0)
 
   // A ranged request that the upstream actually honored (206) — pass the
-  // slice straight through without buffering the whole file server-side.
+  // slice straight through.
   if (rangeHeader && upstreamRes.status === 206) {
     mark('upstream honored range, passing slice through')
     const headers = pdfHeaders(doc.title)
@@ -164,17 +175,7 @@ export async function buildPdfResponse(doc: StreamablePdf, rangeHeader?: string 
     return new NextResponse(upstreamRes.body, { status: 206, headers })
   }
 
-  // Only buffer+cache whole-file responses under the size cap — a range
-  // request the upstream didn't honor (fell back to 200) shouldn't get
-  // cached mid-slice as if it were the full, unranged file.
-  if (!rangeHeader && contentLength > 0 && contentLength < MAX_CACHE_BYTES) {
-    const buf = Buffer.from(await upstreamRes.arrayBuffer())
-    mark('buffered small file')
-    cache.set(byteCacheKey, buf.toString('base64'), 21600).catch(() => {}) // 6h, best-effort
-    return new NextResponse(new Uint8Array(buf), { headers: pdfHeaders(doc.title, buf.length) })
-  }
-
-  mark('streaming pass-through (large or unknown size)')
+  mark('streaming pass-through')
   return new NextResponse(upstreamRes.body, {
     headers: pdfHeaders(doc.title, contentLength || undefined),
   })

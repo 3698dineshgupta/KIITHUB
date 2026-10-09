@@ -1,4 +1,5 @@
 import { SuggestionItem } from '@/lib/recommendations'
+import { SubjectDocumentGroup } from '@/lib/subject-documents'
 
 export interface DocumentMeta {
   contentType: string
@@ -26,6 +27,7 @@ export interface DocumentDetail {
   userEmail: string
   meta: DocumentMeta
   suggestions: SuggestionItem[]
+  subjectDocuments: SubjectDocumentGroup[]
 }
 
 export interface DocumentGateResponse {

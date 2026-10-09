@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyStreamToken } from '@/lib/jwt'
 import { prisma } from '@/lib/prisma'
-import { buildPdfResponse } from '@/lib/pdf-stream'
+import { buildPdfResponse, getCachedNoteMeta } from '@/lib/pdf-stream'
 import { canAccessPremiumDoc } from '@/lib/upload-reward'
 
 const devTiming = process.env.NODE_ENV !== 'production'
@@ -26,10 +26,13 @@ export async function GET(
     }
     if (devTiming) console.log(`[stream/note] token verified +${(performance.now() - t0).toFixed(0)}ms`)
 
-    // User and note lookups are independent — run concurrently.
+    // User and note lookups are independent — run concurrently. The note
+    // side is cached (getCachedNoteMeta): this route is hit once per pdf.js
+    // Range request, not once per document view, so a fresh Postgres query
+    // on every single one of those was the dominant per-request cost.
     const [user, note] = await Promise.all([
       prisma.user.findUnique({ where: { id: payload.userId } }),
-      prisma.note.findUnique({ where: { id } }),
+      getCachedNoteMeta(id),
     ])
     if (devTiming) console.log(`[stream/note] user+note fetched +${(performance.now() - t0).toFixed(0)}ms`)
 
@@ -41,7 +44,7 @@ export async function GET(
     // credit gets spent (see lib/upload-reward.ts). By the time a valid
     // signed token exists, access was already decided (and any credit
     // already consumed) upstream in the page load / /view POST.
-    if (note.isPremium && !(await canAccessPremiumDoc(user, 'note', note.id))) {
+    if (note.isPremium && !(await canAccessPremiumDoc(user, 'note', id))) {
       return NextResponse.json({ error: 'Premium required' }, { status: 403 })
     }
 

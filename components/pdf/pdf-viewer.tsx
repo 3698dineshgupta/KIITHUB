@@ -3,13 +3,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import {
-  ZoomIn, ZoomOut, Maximize2, Minimize2, Loader2, ShieldAlert, Bug
+  ZoomIn, ZoomOut, Maximize2, Minimize2, Loader2, ShieldAlert, Bug, FileStack
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useDocumentLoaderStore, useBugReportStore } from '@/store'
 import { DocumentNavArrows } from '@/components/pdf/document-nav-arrows'
+import { SubjectDocumentsList, type SubjectDocumentsSelectHandler } from '@/components/pdf/subject-documents-panel'
+import type { SubjectDocumentGroup } from '@/lib/subject-documents'
 
 // react-pdf bundles its own pinned pdfjs-dist internally, separate from (and
 // usually a different version than) this project's top-level pdfjs-dist
@@ -35,6 +37,13 @@ interface PDFViewerNavProps {
   disabled?: boolean
 }
 
+interface PDFViewerDocumentsProps {
+  subjectName: string
+  groups: SubjectDocumentGroup[]
+  current: { type: 'note' | 'pyq'; slug: string }
+  onSelect: SubjectDocumentsSelectHandler
+}
+
 interface PDFViewerProps {
   streamUrl: string
   title: string
@@ -42,16 +51,25 @@ interface PDFViewerProps {
   totalPages?: number | null
   userEmail?: string
   nav?: PDFViewerNavProps
+  documents?: PDFViewerDocumentsProps
+  // Fullscreen is controlled by DocumentViewerShell, not owned here — see the
+  // comment above its shellContainerRef for why: the fullscreen target has
+  // to be one ancestor shared by every mounted document, not each
+  // PDFViewer's own root div, or switching documents force-exits fullscreen.
+  fullscreen: boolean
+  onToggleFullscreen: () => void
 }
 
-export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail, nav }: PDFViewerProps) {
+export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail, nav, documents, fullscreen, onToggleFullscreen }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number | null>(totalPages || null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [fullscreen, setFullscreen] = useState(false)
   const [zoom, setZoom] = useState(1.0) // 100% = fits the page container's width exactly
+  const [docsOpen, setDocsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const pagesContainerRef = useRef<HTMLDivElement>(null)
+  const docsPanelRef = useRef<HTMLDivElement>(null)
+  const docsButtonRef = useRef<HTMLButtonElement>(null)
   const hasClosedLoaderRef = useRef(false)
 
   // Pages used to render at a raw pdf.js `scale` (1.0 ≈ the PDF's native
@@ -101,6 +119,7 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail, 
     setLoading(true)
     setError(null)
     setNumPages(totalPages || null)
+    setDocsOpen(false)
     hasClosedLoaderRef.current = false
     const { token, setStage } = useDocumentLoaderStore.getState()
     setStage(token, 'streaming')
@@ -140,21 +159,22 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail, 
     }
   }, [])
 
-  const handleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen()
-      setFullscreen(true)
-    } else {
-      document.exitFullscreen()
-      setFullscreen(false)
-    }
-  }
-
+  // Closes the Documents popover on an outside click. Listens on
+  // containerRef, not document, so it keeps working while fullscreen (the
+  // fullscreened element's own subtree is the only thing still receiving
+  // real pointer events from the OS at that point).
   useEffect(() => {
-    const onFSChange = () => setFullscreen(!!document.fullscreenElement)
-    document.addEventListener('fullscreenchange', onFSChange)
-    return () => document.removeEventListener('fullscreenchange', onFSChange)
-  }, [])
+    if (!docsOpen) return
+    const el = containerRef.current
+    if (!el) return
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node
+      if (docsPanelRef.current?.contains(target) || docsButtonRef.current?.contains(target)) return
+      setDocsOpen(false)
+    }
+    el.addEventListener('pointerdown', onPointerDown)
+    return () => el.removeEventListener('pointerdown', onPointerDown)
+  }, [docsOpen])
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages)
@@ -178,9 +198,9 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail, 
       ref={containerRef}
       className={cn(
         'relative rounded-xl border bg-muted/20 overflow-hidden select-none flex flex-col',
-        fullscreen ? 'fixed inset-0 z-50 rounded-none bg-zinc-950' : 'w-full'
+        fullscreen ? 'h-full w-full rounded-none border-0 bg-zinc-950' : 'w-full'
       )}
-      style={{ minHeight: fullscreen ? '100vh' : 600 }}
+      style={{ minHeight: fullscreen ? '100%' : 600 }}
     >
       {/* Prev/Next material navigation — lives inside this container (not a
           sibling) so it stays visible and correctly stacked when the reader
@@ -208,9 +228,21 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail, 
           <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer" onClick={() => setZoom(z => Math.min(2.0, z + 0.15))} title="Zoom In">
             <ZoomIn className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 sm:ml-1 cursor-pointer" onClick={handleFullscreen} title="Fullscreen">
+          <Button variant="ghost" size="icon" className="h-8 w-8 sm:ml-1 cursor-pointer" onClick={onToggleFullscreen} title="Fullscreen">
             {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </Button>
+          {documents && documents.groups.length > 0 && (
+            <Button
+              ref={docsButtonRef}
+              variant="ghost"
+              size="icon"
+              className={cn('h-8 w-8 cursor-pointer', docsOpen && 'bg-muted')}
+              onClick={() => setDocsOpen(o => !o)}
+              title="All documents for this subject"
+            >
+              <FileStack className="h-4 w-4" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -222,6 +254,26 @@ export function PDFViewer({ streamUrl, title, isPremium, totalPages, userEmail, 
           </Button>
         </div>
       </div>
+
+      {/* Documents popover — rendered inside containerRef (not a portal), so
+          it stays visible and clickable while fullscreen, same reasoning as
+          the Prev/Next arrows above. */}
+      {documents && docsOpen && (
+        <div
+          ref={docsPanelRef}
+          className="absolute right-3 sm:right-4 top-[52px] z-40 w-80 max-w-[calc(100%-1.5rem)] rounded-xl border bg-background shadow-xl p-4"
+        >
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className="text-sm font-semibold truncate">Documents · {documents.subjectName}</span>
+            <Badge variant="secondary" className="flex-shrink-0">
+              {documents.groups.reduce((sum, g) => sum + g.items.length, 0)}
+            </Badge>
+          </div>
+          <div className="max-h-80 overflow-y-auto pr-1">
+            <SubjectDocumentsList groups={documents.groups} current={documents.current} onSelect={item => { setDocsOpen(false); documents.onSelect(item) }} />
+          </div>
+        </div>
+      )}
 
       {/* Pages Container */}
       <div ref={pagesContainerRef} className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-6 bg-zinc-900/40 flex flex-col items-center gap-6 relative" style={{ maxHeight: fullscreen ? 'calc(100vh - 48px)' : 650 }}>
