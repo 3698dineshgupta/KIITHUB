@@ -166,6 +166,11 @@ model User {
   // (lib/upload-reward.ts) the first time each distinct premium document is
   // opened — reopening an already-unlocked document never costs another.
   uploadPremiumCredits  Int              @default(0)
+  // Set once the price-hike notice popup has actually been shown to this
+  // user — never reset. Stored server-side (not localStorage) so "shown
+  // exactly once" holds across devices, browsers, and cleared site data,
+  // for both existing accounts and new signups (both start null).
+  priceHikeNoticeSeenAt DateTime?
   // @default(cuid()) exists so NextAuth's PrismaAdapter — which creates
   // Google sign-in users directly via prisma.user.create() and has no idea
   // this column exists — never violates the NOT NULL/unique constraint.

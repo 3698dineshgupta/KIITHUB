@@ -8,6 +8,7 @@ import { JsonLd, SITE_URL, SITE_NAME } from '@/components/seo/json-ld'
 import { DocumentLoadingOverlay } from '@/components/pdf/document-loading-overlay'
 import { ReportBugDialog } from '@/components/bugs/report-bug-dialog'
 import { PresenceHeartbeat } from '@/components/presence/presence-heartbeat'
+import { PriceHikeNotice } from '@/components/premium/price-hike-notice'
 
 const inter = Inter({ subsets: ['latin'], display: 'swap' })
 
@@ -81,6 +82,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <DocumentLoadingOverlay />
           <ReportBugDialog />
           <PresenceHeartbeat />
+          <PriceHikeNotice />
         </Providers>
       </body>
     </html>
